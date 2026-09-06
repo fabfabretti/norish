@@ -5,6 +5,9 @@ name: Docker CI image (fork test)
 # Remove once the caption-first import experiment is done.
 
 on:
+  push:
+    branches:
+      - feature/social-caption-first
   workflow_dispatch:
 
 permissions:
