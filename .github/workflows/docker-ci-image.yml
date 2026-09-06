@@ -1,0 +1,25 @@
+name: Docker CI image (fork test)
+
+# Temporary: builds and publishes a test image from the current branch so a
+# local instance can test it without running the heavy Docker build at home.
+# Remove once the caption-first import experiment is done.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # The push build exports its BuildKit layer cache to GHCR, which needs write.
+  packages: write
+
+jobs:
+  docker-build:
+    name: Build fork test image
+    uses: ./.github/workflows/_docker-build.yml
+    secrets: inherit
+    with:
+      arches: '["amd64"]'
+      primary-image: ghcr.io/fabfabretti/norish
+      cache-image: ghcr.io/fabfabretti/norish-buildcache
+      tags: ci-test
+      push: true

@@ -1,9 +1,11 @@
+import type { VideoMetadata } from "@norish/api/video/types";
 import type { SiteAuthTokenDecryptedDto } from "@norish/shared/contracts/dto/site-auth-tokens";
 import { fetchRenderedPage } from "@norish/api/parser/fetch";
 import { extractRecipeNodesFromJsonLd } from "@norish/api/parser/jsonld";
 import { adaptRecipeScrapersResponse } from "@norish/api/parser/python/adapter";
 import { callRecipeScrapersParser } from "@norish/api/parser/python/client";
 import { extractRecipeWithAI } from "@norish/api/parser/recipe-extraction";
+import { getVideoMetadata } from "@norish/api/video/yt-dlp";
 import {
   getContentIndicators,
   isAIEnabled,
@@ -11,6 +13,7 @@ import {
   shouldAlwaysUseAI,
 } from "@norish/shared-server/config/server-config-loader";
 import { parserLogger as log } from "@norish/shared-server/logger";
+import { downloadImage } from "@norish/shared-server/media/storage";
 import { FullRecipeInsertDTO } from "@norish/shared/contracts/dto/recipe";
 import { hasRecipeName, isVideoUrl } from "@norish/shared/lib/helpers";
 
@@ -157,6 +160,16 @@ async function tryHandleVideoUrl(
 ): Promise<ParseRecipeResult | null> {
   if (!isVideoUrl(url)) return null;
 
+  // Try the post caption before committing to a video download/transcription.
+  // A social post often carries the full recipe in its caption, in which case
+  // the cheaper plain-text extraction is enough. Only runs when AI is on, so
+  // it never adds an AI requirement on top of what the video path already has.
+  if (await isAIEnabled()) {
+    const captionRecipe = await tryExtractFromCaption(url, recipeId, tokens);
+
+    if (captionRecipe) return { recipe: captionRecipe, usedAI: true };
+  }
+
   // Two checks so the failure names the setting that is actually off: a video
   // recipe is extracted with AI, so with AI disabled the import can only cost
   // money (download, transcription) before failing.
@@ -177,6 +190,65 @@ async function tryHandleVideoUrl(
     log.error({ err: error }, "Video processing failed");
     throw error;
   }
+}
+
+/**
+ * Try to extract a recipe from a post's caption/description via plain-text
+ * extraction, before the media is downloaded. Returns null when there is no
+ * caption, metadata cannot be fetched, or the caption holds no recipe, so the
+ * caller can fall back to the media flow unchanged.
+ */
+async function tryExtractFromCaption(
+  url: string,
+  recipeId: string,
+  tokens?: SiteAuthTokenDecryptedDto[]
+): Promise<FullRecipeInsertDTO | null> {
+  let metadata: VideoMetadata | null = null;
+
+  try {
+    metadata = await getVideoMetadata(url, tokens);
+  } catch (error: unknown) {
+    log.debug({ url, err: error }, "Could not fetch metadata for caption extraction");
+  }
+
+  const description = metadata?.description?.trim() || "";
+
+  if (!description) return null;
+
+  log.info(
+    { url, descriptionLength: description.length },
+    "Trying recipe extraction from post caption first"
+  );
+
+  let recipe: FullRecipeInsertDTO;
+
+  try {
+    recipe = await extractRecipeWithAI(description, recipeId, url);
+  } catch (error: unknown) {
+    log.info(
+      { url, err: error },
+      "Caption extraction did not yield a recipe, falling back to media"
+    );
+
+    return null;
+  }
+
+  // Attach the post thumbnail as the recipe cover, matching the Instagram
+  // image-post caption path. A failed download is not fatal.
+  if (metadata.thumbnail) {
+    try {
+      const imagePath = await downloadImage(metadata.thumbnail, recipeId);
+
+      recipe.image = imagePath;
+      recipe.images = [{ image: imagePath, order: 0 }];
+    } catch {
+      log.debug({ url }, "Failed to download video thumbnail");
+    }
+  }
+
+  log.info({ url, recipeName: recipe.name }, "Successfully extracted recipe from post caption");
+
+  return recipe;
 }
 
 export async function parseRecipeFromUrl(
