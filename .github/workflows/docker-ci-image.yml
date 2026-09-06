@@ -2,6 +2,10 @@ name: Docker CI image (fork test)
 
 # Temporary: builds and publishes a test image from the current branch so a
 # local instance can test it without running the heavy Docker build at home.
+#
+# This is a fork-local variant of the release build: it pushes only to the
+# fork's own GHCR (never Docker Hub, which the release build needs secrets
+# this fork does not have) and reads the upstream layer cache to stay fast.
 # Remove once the caption-first import experiment is done.
 
 on:
@@ -12,17 +16,49 @@ on:
 
 permissions:
   contents: read
-  # The push build exports its BuildKit layer cache to GHCR, which needs write.
+  # Pushes the image and the BuildKit layer cache to GHCR.
   packages: write
 
 jobs:
   docker-build:
-    name: Build fork test image
-    uses: ./.github/workflows/_docker-build.yml
-    secrets: inherit
-    with:
-      arches: '["amd64"]'
-      primary-image: ghcr.io/fabfabretti/norish
-      cache-image: ghcr.io/fabfabretti/norish-buildcache
-      tags: ci-test
-      push: true
+    name: Push GHCR test image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read package versions
+        id: versions
+        run: |
+          report="$(node tooling/monorepo/scripts/print-package-versions.mjs)"
+          echo "report=${report}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            NORISH_VERSION_REPORT_JSON=${{ steps.versions.outputs.report }}
+          tags: ghcr.io/fabfabretti/norish:ci-test
+          push: true
+          cache-from: |
+            type=registry,ref=ghcr.io/norish-recipes/norish-buildcache:amd64
+            type=registry,ref=ghcr.io/fabfabretti/norish-buildcache:amd64
+          cache-to: |
+            type=registry,ref=ghcr.io/fabfabretti/norish-buildcache:amd64,mode=max,image-manifest=true,oci-mediatypes=true
+
+      - name: Inspect published image
+        run: docker buildx imagetools inspect ghcr.io/fabfabretti/norish:ci-test
