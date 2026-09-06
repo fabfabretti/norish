@@ -36,10 +36,7 @@ import {
 import { announceUsableRecipe } from "@norish/queue/enrichment/announce";
 import { getRecipeEnrichmentStatus } from "@norish/queue/enrichment/status";
 import { getQueues } from "@norish/queue/registry";
-import {
-  getRecipePermissionPolicy,
-  isVideoParsingEnabled,
-} from "@norish/shared-server/config/server-config-loader";
+import { getRecipePermissionPolicy } from "@norish/shared-server/config/server-config-loader";
 import { trpcLogger as log } from "@norish/shared-server/logger";
 import { withDishColor, withDishColorForUpdate } from "@norish/shared-server/media/dish-color";
 import { deleteRecipeImagesDir } from "@norish/shared-server/media/storage";
@@ -387,21 +384,16 @@ export const importFromUrlProcedure = authedProcedure
     // downloads and may transcribe before extraction runs. Refuse before
     // dispatching so a doomed import costs nothing and fails in the caller's
     // hands rather than in a queued job the user watches time out.
-    if (isVideoUrl(url)) {
-      if (!(await checkAIEnabled())) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message:
-            "Video imports use AI to extract the recipe, and AI features are not enabled. Enable AI in the admin settings.",
-        });
-      }
-
-      if (!(await isVideoParsingEnabled())) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Video recipe parsing is not enabled. Enable it in the admin settings.",
-        });
-      }
+    //
+    // Only the AI check stays here: a caption can be extracted without video
+    // parsing, so a video-parsing-off URL is dispatched so the worker can try
+    // the caption first and only fall back to (or fail with) the video gate.
+    if (isVideoUrl(url) && !(await checkAIEnabled())) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message:
+          "Video imports use AI to extract the recipe, and AI features are not enabled. Enable AI in the admin settings.",
+      });
     }
 
     // Add job to queue - returns conflict status if duplicate in queue
