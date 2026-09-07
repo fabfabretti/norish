@@ -43,9 +43,17 @@ import { createFetchWithTimeout } from "./transport";
  * (#538).
  */
 const OPENAI_COMPATIBLE_PROVIDERS: ReadonlySet<AIProvider> = new Set([
+  "deepseek",
   "generic-openai",
   "lm-studio",
 ]);
+
+/**
+ * Compat providers whose replies flake on shape even when the rest of the JSON
+ * is right — DeepSeek turns arrays into objects under a large schema. Their
+ * plain-JSON requests are parsed through the repair path, not the SDK parse.
+ */
+export const PROVIDERS_WITH_SHAPE_REPAIR: ReadonlySet<AIProvider> = new Set(["deepseek"]);
 
 /** Whether a plain-JSON retry is available for this provider (#538). */
 export function canDegradeToJsonMode(provider: AIProvider): boolean {
