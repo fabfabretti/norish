@@ -19,14 +19,15 @@
 import { createReadStream } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
-import type { z } from "zod";
 import {
   asSchema,
   experimental_transcribe,
   generateImage as generateImageWithModel,
   generateText,
+  NoObjectGeneratedError,
   Output,
 } from "ai";
+import { z } from "zod";
 
 import type { AIConfig, TranscriptionProvider } from "@norish/config/zod/server-config";
 import {
@@ -57,6 +58,7 @@ import {
   createImageModelFromConfig,
   createModelsFromConfig,
   createTranscriptionModel,
+  PROVIDERS_WITH_SHAPE_REPAIR,
   requestOllamaTranscription,
 } from "./providers";
 
@@ -193,6 +195,11 @@ async function requestObject<T>({
     ? `${SYSTEM_MESSAGES[promptName]}\n\n${await jsonModeInstruction(schema)}`
     : SYSTEM_MESSAGES[promptName];
 
+  // DeepSeek's compat replies flake on shape, so its plain-JSON requests drop
+  // the SDK's strict parse and validate through the repair path below; everyone
+  // else keeps the schema-constrained request.
+  const compatParse = jsonMode && PROVIDERS_WITH_SHAPE_REPAIR.has(config.provider);
+
   aiLogger.debug(
     {
       feature: promptName,
@@ -206,7 +213,7 @@ async function requestObject<T>({
 
   const result = await generateText({
     model: useVision ? visionModel : model,
-    output: Output.object({ schema }),
+    ...(compatParse ? {} : { output: Output.object({ schema }) }),
     system,
     temperature: config.temperature,
     maxOutputTokens: config.maxTokens,
@@ -242,7 +249,80 @@ async function requestObject<T>({
     "AI request completed"
   );
 
+  if (compatParse) {
+    return parseJsonResult<T>(result, schema);
+  }
+
   return result.output;
+}
+
+/**
+ * In plain JSON mode the model only promised valid JSON, so it is parsed and
+ * validated here against the schema. Compat-mode providers (DeepSeek among
+ * them) sometimes degrade arrays into objects — `{"0": "…", "1": "…"}` or a
+ * single wrapper key — even when the rest of the reply is right, so the shape
+ * is repaired before validation instead of failing the whole request.
+ */
+function parseJsonResult<T>(result: { text?: string }, schema: z.ZodType<T>): T {
+  const raw = (result.text ?? "")
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "");
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch (cause) {
+    throw new AIResponseError("The model's response was not valid JSON.", { cause });
+  }
+
+  try {
+    return schema.parse(repairArrayShape(parsed, schema));
+  } catch (cause) {
+    throw new AIResponseError("The model's response did not match the expected shape.", { cause });
+  }
+}
+
+/** Rebuild a reply where arrays arrived as objects, matching the schema. */
+export function repairArrayShape(value: unknown, schema: z.ZodType<unknown>): unknown {
+  if (schema instanceof z.ZodObject) {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+
+    const repaired: Record<string, unknown> = {};
+
+    for (const [key, childSchema] of Object.entries(schema.shape)) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        repaired[key] = repairArrayShape((value as Record<string, unknown>)[key], childSchema);
+      }
+    }
+
+    return repaired;
+  }
+
+  if (schema instanceof z.ZodArray) {
+    let array = value;
+
+    if (!Array.isArray(array) && array !== null && typeof array === "object") {
+      const entries = Object.entries(array as Record<string, unknown>);
+
+      if (entries.length === 0) {
+        array = [];
+      } else if (entries.every(([key]) => /^\d+$/.test(key))) {
+        array = entries.map(([, item]) => item);
+      } else if (entries.length === 1 && Array.isArray(entries[0][1])) {
+        array = entries[0][1];
+      }
+    }
+
+    if (Array.isArray(array)) {
+      return array.map((item) => repairArrayShape(item, schema.element));
+    }
+
+    return array;
+  }
+
+  return value;
 }
 
 /** Log a failed request once, as the typed error the caller will see. */
@@ -268,11 +348,14 @@ function reportFailure(promptName: StructuredPromptName, error: unknown): never 
  * A generic OpenAI-compatible endpoint gets a second chance: what sits behind
  * a typed base URL decides whether a strict `json_schema` request is servable
  * at all, and an aggregator reports that as a routing failure blaming the
- * account's settings. So a refused request shape is retried once in plain JSON
- * mode with the schema in the prompt, which most models handle, and only a
- * second refusal is reported — naming the missing capability rather than the
- * aggregator's guess, and not worth another queue attempt (#538).
+ * account's settings. So a refused request shape — as well as a compat-mode
+ * reply that fails the schema, whose JSON is repaired before parsing in plain
+ * JSON mode — is retried once with the schema in the prompt, which most models
+ * handle, and only a second refusal is reported — naming the missing
+ * capability rather than the aggregator's guess, and not worth another queue
+ * attempt (#538).
  */
+
 export async function generateStructured<T>(options: GenerateOptions<T>): Promise<T> {
   const { prompt: promptName, schema, sections = [], fill, images = [] } = options;
 
@@ -291,13 +374,16 @@ export async function generateStructured<T>(options: GenerateOptions<T>): Promis
   try {
     return await requestObject({ ...request, jsonMode: false });
   } catch (error) {
-    if (!canDegradeToJsonMode(config.provider) || !isRequestShapeRejection(error)) {
+    if (
+      !canDegradeToJsonMode(config.provider) ||
+      (!isRequestShapeRejection(error) && !NoObjectGeneratedError.isInstance(error))
+    ) {
       reportFailure(promptName, error);
     }
 
     aiLogger.warn(
       { err: error, feature: promptName, provider: config.provider },
-      "Endpoint refused a JSON-schema request, retrying in plain JSON mode"
+      "Endpoint refused the schema-constrained request, retrying in plain JSON mode"
     );
 
     try {
