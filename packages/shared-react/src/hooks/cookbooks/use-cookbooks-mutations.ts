@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import type { CookbookSummaryDTO } from "@norish/shared/contracts";
+import type { CookbookRuleDTO, CookbookSummaryDTO } from "@norish/shared/contracts";
 import { createClientId } from "@norish/shared/lib/operation-helpers";
 
 import type {
@@ -37,13 +37,14 @@ export function createUseCookbooksMutations({
 
     const createMutation = useMutation(trpc.cookbooks.create.mutationOptions());
     const renameMutation = useMutation(trpc.cookbooks.rename.mutationOptions());
+    const ruleMutation = useMutation(trpc.cookbooks.updateRule.mutationOptions());
     const deleteMutation = useMutation(trpc.cookbooks.remove.mutationOptions());
     const membershipMutation = useMutation(trpc.cookbooks.setMembership.mutationOptions());
 
     const invalidateUnlessQueued = invalidateUnlessPreserved(invalidate, preserve);
 
     const createCookbook = useCallback(
-      ({ title, recipeId }: { title: string; recipeId?: string }) => {
+      ({ title, recipeId, rule }: { title: string; recipeId?: string; rule?: CookbookRuleDTO }) => {
         // Minted here, so filing queued behind an Offline create still points
         // at the right cookbook once replayed (ADR-0003).
         const id = createClientId();
@@ -55,6 +56,7 @@ export function createUseCookbooksMutations({
           id,
           userId: currentUserId ?? null,
           title,
+          rule: rule ?? { kind: "manual" },
           createdAt: now,
           updatedAt: now,
           version: 1,
@@ -83,7 +85,7 @@ export function createUseCookbooksMutations({
 
         return new Promise<string>((resolve, reject) => {
           createMutation.mutate(
-            { id, title, recipeId },
+            { id, title, recipeId, rule },
             {
               onSuccess: (cookbook) => {
                 invalidate();
@@ -268,6 +270,35 @@ export function createUseCookbooksMutations({
       [renameMutation, setAllCookbooksData, invalidateCookbook, invalidateUnlessQueued]
     );
 
+    /**
+     * Re-point a smart cookbook's rule. The members are derived at read time,
+     * so the only cache work is the row itself — the next fetch answers the
+     * count honestly.
+     */
+    const updateRule = useCallback(
+      ({ id, version, rule }: { id: string; version: number; rule: CookbookRuleDTO }) => {
+        setAllCookbooksData((prev) => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            pages: prev.pages.map((page) => ({
+              ...page,
+              cookbooks: page.cookbooks.map((cookbook) =>
+                cookbook.id === id ? { ...cookbook, rule } : cookbook
+              ),
+            })),
+          };
+        });
+
+        ruleMutation.mutate(
+          { id, version, rule },
+          { onSuccess: () => invalidateCookbook(id), onError: invalidateUnlessQueued }
+        );
+      },
+      [ruleMutation, setAllCookbooksData, invalidateCookbook, invalidateUnlessQueued]
+    );
+
     const deleteCookbook = useCallback(
       ({ id, version }: { id: string; version: number }) => {
         setAllCookbooksData((prev) => {
@@ -295,6 +326,7 @@ export function createUseCookbooksMutations({
     return {
       createCookbook,
       renameCookbook,
+      updateRule,
       deleteCookbook,
       setMembership,
       isCreating: createMutation.isPending,

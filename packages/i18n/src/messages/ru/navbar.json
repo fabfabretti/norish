@@ -31,7 +31,8 @@
   "nav": {
     "home": "Рецепты",
     "calendar": "Календарь",
-    "groceries": "Список покупок"
+    "groceries": "Список покупок",
+    "collections": "Collections"
   },
   "mobile": {
     "searchPlaceholder": "Поиск рецептов...",

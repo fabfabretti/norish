@@ -24,6 +24,7 @@ import {
   listEditableCookbooks,
   removeRecipeFromCookbook,
   renameCookbook,
+  updateCookbookRule,
 } from "@norish/db/repositories/cookbooks";
 import { setFavorite } from "@norish/db/repositories/favorites";
 import { deleteRecipeById, listRecipes } from "@norish/db/repositories/recipes";
@@ -514,6 +515,169 @@ describe("cookbook repository", () => {
 
       expect(stale.stale).toBe(true);
       expect(await getCookbookForViewer(viewer(ownerId), cookbook.id)).not.toBeNull();
+    });
+  });
+
+  describe("smart (rule-driven) cookbooks", () => {
+    async function tagId(name: string) {
+      const [tag] = await getTestDb()
+        .select()
+        .from(tagsTable)
+        .where(eq(tagsTable.name, name))
+        .limit(1);
+
+      return tag!.id;
+    }
+
+    /** Three recipes: dinner+quick, dinner, quick. */
+    async function createTaggedRecipes() {
+      const pasta = await createTestRecipe(ownerId, { name: "Pasta", servings: 2 });
+      const curry = await createTestRecipe(ownerId, { name: "Curry", servings: 2 });
+      const salad = await createTestRecipe(ownerId, { name: "Salad", servings: 2 });
+
+      await tagRecipe(pasta.id, ["dinner", "quick"]);
+      await tagRecipe(curry.id, ["dinner"]);
+      await tagRecipe(salad.id, ["quick"]);
+
+      return { pasta, curry, salad };
+    }
+
+    it("derives a smart cookbook's members from its tag rule at read time", async () => {
+      const { pasta, curry, salad } = await createTaggedRecipes();
+      const dinner = await tagId("dinner");
+
+      const cookbook = await createCookbook({
+        userId: ownerId,
+        title: "Dinners",
+        rule: { kind: "tags", tagIds: [dinner], matchMode: "OR" },
+      });
+
+      expect(cookbook.rule).toEqual({ kind: "tags", tagIds: [dinner], matchMode: "OR" });
+
+      const summary = await getCookbookForViewer(viewer(ownerId), cookbook.id);
+
+      expect(summary?.memberCount).toBe(2);
+      expect(summary?.memberTitles.sort()).toEqual(["Curry", "Pasta"]);
+      expect(summary?.memberTags).toEqual(["dinner", "quick"]);
+
+      const ids = await listCookbookMemberIds(cookbook.id, cookbook.rule);
+
+      expect(ids.sort()).toEqual([curry.id, pasta.id].sort());
+      expect(ids).not.toContain(salad.id);
+    });
+
+    it("AND matches only recipes carrying every chosen tag", async () => {
+      const { pasta, curry, salad } = await createTaggedRecipes();
+      const dinner = await tagId("dinner");
+      const quick = await tagId("quick");
+
+      const cookbook = await createCookbook({
+        userId: ownerId,
+        title: "Quick dinners",
+        rule: { kind: "tags", tagIds: [dinner, quick], matchMode: "AND" },
+      });
+
+      const ids = await listCookbookMemberIds(cookbook.id, cookbook.rule);
+
+      expect(ids).toEqual([pasta.id]);
+      expect(ids).not.toContain(curry.id);
+      expect(ids).not.toContain(salad.id);
+    });
+
+    it("re-derives members when a recipe's tags change, with no backfill", async () => {
+      const { pasta, curry } = await createTaggedRecipes();
+      const dinner = await tagId("dinner");
+
+      const cookbook = await createCookbook({
+        userId: ownerId,
+        title: "Dinners",
+        rule: { kind: "tags", tagIds: [dinner], matchMode: "OR" },
+      });
+
+      expect(await listCookbookMemberIds(cookbook.id, cookbook.rule)).toEqual(
+        expect.arrayContaining([pasta.id, curry.id])
+      );
+
+      await getTestDb()
+        .delete(recipeTagsTable)
+        .where(eq(recipeTagsTable.recipeId, curry.id));
+
+      expect(await listCookbookMemberIds(cookbook.id, cookbook.rule)).toEqual([pasta.id]);
+    });
+
+    it("a rule change re-derives the members and bumps the version", async () => {
+      const { pasta, curry, salad } = await createTaggedRecipes();
+      const dinner = await tagId("dinner");
+      const quick = await tagId("quick");
+
+      const cookbook = await createCookbook({
+        userId: ownerId,
+        title: "Things",
+        rule: { kind: "tags", tagIds: [dinner], matchMode: "OR" },
+      });
+
+      const outcome = await updateCookbookRule(cookbook.id, cookbook.version, {
+        kind: "tags",
+        tagIds: [quick],
+        matchMode: "OR",
+      });
+
+      expect(outcome.applied).toBe(true);
+      expect(outcome.value?.version).toBe(2);
+
+      const summary = await getCookbookForViewer(viewer(ownerId), cookbook.id);
+
+      expect(summary?.memberCount).toBe(2);
+      expect(summary?.memberTitles.sort()).toEqual(["Pasta", "Salad"]);
+    });
+
+    it("a stale rule change is dropped like a stale rename", async () => {
+      const cookbook = await createCookbook({ userId: ownerId, title: "Dinners" });
+
+      const outcome = await updateCookbookRule(cookbook.id, 999, { kind: "manual" });
+
+      expect(outcome.stale).toBe(true);
+    });
+
+    it("keeps smart cookbooks out of the file-in panel", async () => {
+      await createTaggedRecipes();
+      const dinner = await tagId("dinner");
+
+      const manual = await createCookbook({ userId: ownerId, title: "Hands" });
+      const smart = await createCookbook({
+        userId: ownerId,
+        title: "Auto",
+        rule: { kind: "tags", tagIds: [dinner], matchMode: "OR" },
+      });
+
+      const titles = (await listEditableCookbooks(viewer(ownerId))).map((cookbook) => cookbook.title);
+
+      expect(titles).toContain(manual.title);
+      expect(titles).not.toContain(smart.title);
+    });
+
+    it("lists a smart cookbook's page from its rule, under the reader's own filters", async () => {
+      const { pasta, curry } = await createTaggedRecipes();
+      const dinner = await tagId("dinner");
+
+      const result = await listRecipes(
+        viewer(ownerId),
+        20,
+        0,
+        undefined,
+        ["title"],
+        undefined,
+        "OR",
+        "dateDesc",
+        undefined,
+        undefined,
+        undefined,
+        { rule: { tagIds: [dinner], matchMode: "OR" } }
+      );
+
+      expect(result.recipes.map((recipe) => recipe.id).sort()).toEqual(
+        [curry.id, pasta.id].sort()
+      );
     });
   });
 });

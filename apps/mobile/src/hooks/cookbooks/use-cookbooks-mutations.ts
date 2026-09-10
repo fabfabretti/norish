@@ -1,0 +1,3 @@
+import { sharedCookbookHooks } from "./shared-cookbook-hooks";
+
+export const useCookbooksMutations = sharedCookbookHooks.useCookbooksMutations;

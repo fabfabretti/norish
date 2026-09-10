@@ -11,21 +11,26 @@ import {
   CookbookMetadata,
   VISIBLE_ALLERGENS_IN_ROW,
 } from "@/components/cookbooks/cookbook-metadata";
-import { CookbookEditPanel, DeleteCookbookModal } from "@/components/cookbooks/cookbook-panels";
+import {
+  CookbookEditPanel,
+  DeleteCookbookModal,
+} from "@/components/cookbooks/cookbook-panels";
+import { SmartCookbookPanel } from "@/components/cookbooks/cookbook-smart-panel";
 import { photoChipClassName } from "@/components/dashboard/recipe-metadata";
 import { usePermissionsContext } from "@/context/permissions-context";
 import { useMountedOnceOpened } from "@/hooks/use-mounted-once-opened";
 import { withOrigin } from "@/lib/back-destination";
 import {
+  AdjustmentsVerticalIcon,
   EllipsisHorizontalIcon,
   PencilSquareIcon,
   PlusIcon,
   TrashIcon,
 } from "@heroicons/react/20/solid";
-import { Button, Card, Tooltip } from "@heroui/react";
+import { Button, Card, Chip, Tooltip } from "@heroui/react";
 import { useTranslations } from "next-intl";
 
-import type { CookbookSummaryDTO } from "@norish/shared/contracts";
+import type { CookbookRuleDTO, CookbookSummaryDTO } from "@norish/shared/contracts";
 import { formatMinutesHM, isAllergenTag } from "@norish/shared/lib/helpers";
 
 import SwipeableRow, { SwipeableRowRef, SwipeAction } from "../shared/swipable-row";
@@ -36,6 +41,8 @@ type CookbookCardProps = {
   allergies: string[];
   variant?: "grid" | "list";
   onDelete: (input: { id: string; version: number }) => void;
+  /** Smart cookbooks only: re-point the tag rule driving the members. */
+  onUpdateRule?: (rule: CookbookRuleDTO) => void;
 };
 
 /**
@@ -59,11 +66,13 @@ function CookbookCardComponent({
   allergies,
   variant = "grid",
   onDelete,
+  onUpdateRule,
 }: CookbookCardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const rowRef = useRef<SwipeableRowRef>(null);
   const t = useTranslations("recipes.cookbooks");
+  const tCollections = useTranslations("recipes.collections");
   const { canEditRecipe, canDeleteRecipe } = usePermissionsContext();
   const [rowOpen, setRowOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -73,7 +82,13 @@ function CookbookCardComponent({
   const editMounted = useMountedOnceOpened(editOpen);
   const [addOpen, setAddOpen] = useState(false);
   const addMounted = useMountedOnceOpened(addOpen);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const rulesMounted = useMountedOnceOpened(rulesOpen);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // A smart cookbook derives its members from its rule, so it is editable only
+  // through that rule — no hand filing into it, ever (ADR-0027).
+  const isSmart = cookbook.rule?.kind === "tags";
 
   // Cookbooks answer to the recipe permission policy, so the same two
   // predicates the recipe card uses decide the menu here (ADR-0027).
@@ -96,16 +111,34 @@ function CookbookCardComponent({
     });
   }, [onDelete, cookbook.id, cookbook.version]);
 
+  const handleUpdateRule = useCallback(
+    (rule: CookbookRuleDTO) => {
+      rowRef.current?.closeRow();
+      onUpdateRule?.(rule);
+    },
+    [onUpdateRule]
+  );
+
   const actions: SwipeAction[] = useMemo(() => {
     const list: SwipeAction[] = [];
 
-    if (canEdit) {
+    if (canEdit && !isSmart) {
       list.push({
         key: "add",
         icon: PlusIcon,
         color: "warning",
         onPress: () => setAddOpen(true),
         label: t("addRecipes"),
+      });
+    }
+
+    if (canEdit && isSmart) {
+      list.push({
+        key: "rules",
+        icon: AdjustmentsVerticalIcon,
+        color: "warning",
+        onPress: () => setRulesOpen(true),
+        label: tCollections("editSmartTitle"),
       });
     }
 
@@ -131,7 +164,7 @@ function CookbookCardComponent({
     }
 
     return list;
-  }, [canEdit, canDelete, t]);
+  }, [canEdit, canDelete, isSmart, t, tCollections]);
 
   /*
    * The facts a cookbook derives from its members, read in one place and with
@@ -255,6 +288,17 @@ function CookbookCardComponent({
     />
   );
 
+  /** The mark that says this cookbook gathers itself (ADR-0027). */
+  const smartMark = isSmart ? (
+    <Chip
+      gradient
+      className="pointer-events-none absolute top-2 left-2 z-20 h-6 from-accent/90 to-accent-soft px-2 text-[11px] font-medium shadow-md"
+      radius="full"
+    >
+      {tCollections("smartBadge")}
+    </Chip>
+  ) : null;
+
   const cardContent =
     variant === "list" ? (
       <div
@@ -283,6 +327,7 @@ function CookbookCardComponent({
                   images={cookbook.coverImages}
                   title={cookbook.title}
                 />
+                {smartMark}
               </div>
 
               <Card.Content className="relative flex h-full min-w-0 flex-1 flex-col justify-center py-3 pr-4 pl-4 md:pr-12">
@@ -330,6 +375,7 @@ function CookbookCardComponent({
           >
             <div className="relative h-[236px] w-full shrink-0 overflow-hidden">
               <CookbookCover images={cookbook.coverImages} title={cookbook.title} />
+              {smartMark}
               {coverMetadata}
               {allergens.length > 0 && (
                 <div className="absolute inset-x-0 bottom-0 z-30 flex flex-wrap gap-2 overflow-hidden p-2">
@@ -385,8 +431,17 @@ function CookbookCardComponent({
         <CookbookEditPanel cookbook={cookbook} open={editOpen} onOpenChange={setEditOpen} />
       )}
 
-      {addMounted && (
+      {addMounted && !isSmart && (
         <CookbookAddRecipesPanel cookbook={cookbook} open={addOpen} onOpenChange={setAddOpen} />
+      )}
+
+      {rulesMounted && isSmart && (
+        <SmartCookbookPanel
+          cookbook={cookbook}
+          open={rulesOpen}
+          onOpenChange={setRulesOpen}
+          onUpdateRule={handleUpdateRule}
+        />
       )}
 
       <DeleteCookbookModal
@@ -406,10 +461,19 @@ function sameStrings(a: readonly string[] = [], b: readonly string[] = []) {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
+function sameRule(a: CookbookRuleDTO | undefined, b: CookbookRuleDTO | undefined) {
+  if (!a || !b) return a === b;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "manual") return true;
+
+  return a.matchMode === b.matchMode && sameStrings(a.tagIds, b.tagIds);
+}
+
 const CookbookCard = memo(CookbookCardComponent, (previous, next) => {
   if (previous.variant !== next.variant) return false;
   if (previous.allergies !== next.allergies) return false;
   if (previous.onDelete !== next.onDelete) return false;
+  if (previous.onUpdateRule !== next.onUpdateRule) return false;
 
   const a = previous.cookbook;
   const b = next.cookbook;
@@ -425,6 +489,7 @@ const CookbookCard = memo(CookbookCardComponent, (previous, next) => {
       a.memberCount === b.memberCount &&
       a.totalMinutes === b.totalMinutes &&
       a.minServings === b.minServings &&
+      sameRule(a.rule, b.rule) &&
       sameStrings(a.coverImages, b.coverImages) &&
       sameStrings(a.memberTitles, b.memberTitles) &&
       sameStrings(a.memberTags, b.memberTags))

@@ -402,6 +402,18 @@
     "searchRecipes": "Cerca ricette",
     "noRecipesToAdd": "Nessuna ricetta trovata.",
     "addCount": "{count, plural, one {Aggiungi # ricetta} other {Aggiungi # ricette}}",
-    "everythingAlreadyIn": "Tutte le ricette sono già in questo libro."
+    "everythingAlreadyIn": "Tutte le ricette sono già in questo libro.",
+    "smartMembersNote": "This collection's contents come from its tag rule. Edit the rule from the card to change what is in it."
+  },
+  "collections": {
+    "title": "Collections",
+    "smartBadge": "Auto",
+    "createSmartTitle": "New smart collection",
+    "editSmartTitle": "Edit collection",
+    "tagsLabel": "Tags",
+    "matchesAnd": "Every tag",
+    "matchesOr": "Any tag",
+    "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
+    "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
   }
 }

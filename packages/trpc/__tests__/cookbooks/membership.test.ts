@@ -41,6 +41,7 @@ const appRouter = router({ cookbooks: cookbooksRouter });
 
 const COOKBOOK_ID = "11111111-1111-4111-8111-111111111111";
 const RECIPE_ID = "33333333-3333-4333-8333-333333333333";
+const TAG_ID = "44444444-4444-4444-8444-444444444444";
 
 function callerFor(user = createMockUser()) {
   const household = createMockHousehold();
@@ -59,6 +60,7 @@ function cookbookRow(overrides: Record<string, unknown> = {}) {
     id: COOKBOOK_ID,
     userId: "test-user-id",
     title: "Weeknights",
+    rule: { kind: "manual" },
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     version: 1,
@@ -165,6 +167,44 @@ describe("cookbook membership", () => {
     );
   });
 
+  it("refuses to file into a cookbook whose members are derived from a rule", async () => {
+    canAccessResource.mockResolvedValue(true);
+    getCookbookRow.mockResolvedValue(
+      cookbookRow({
+        rule: { kind: "tags", tagIds: [TAG_ID], matchMode: "AND" },
+      })
+    );
+
+    await expect(
+      callerFor().cookbooks.setMembership({
+        cookbookId: COOKBOOK_ID,
+        recipeId: RECIPE_ID,
+        isMember: true,
+      })
+    ).rejects.toThrow(TRPCError);
+    expect(addRecipeToCookbook).not.toHaveBeenCalled();
+  });
+
+  it("browses a smart cookbook by its rule rather than its join table", async () => {
+    canAccessResource.mockResolvedValue(true);
+    getCookbookRow.mockResolvedValue(
+      cookbookRow({
+        rule: { kind: "tags", tagIds: [TAG_ID], matchMode: "AND" },
+      })
+    );
+    recipesRepository.listRecipes.mockResolvedValue({ recipes: [], total: 0 });
+
+    await callerFor().cookbooks.recipes({ cookbookId: COOKBOOK_ID, limit: 20 });
+
+    const options = recipesRepository.listRecipes.mock.calls[0]?.[11];
+
+    expect(options).toEqual({
+      rule: { tagIds: [TAG_ID], matchMode: "AND" },
+      favoritesOnly: false,
+    });
+    expect(options.cookbookId).toBeUndefined();
+  });
+
   it("creates a cookbook already holding the recipe, in one step", async () => {
     canAccessResource.mockResolvedValue(true);
     createCookbook.mockResolvedValue({
@@ -210,7 +250,7 @@ describe("cookbook membership", () => {
     const result = await callerFor().cookbooks.memberIds({ cookbookId: COOKBOOK_ID });
 
     expect(result).toEqual([RECIPE_ID]);
-    expect(listCookbookMemberIds).toHaveBeenCalledWith(COOKBOOK_ID);
+    expect(listCookbookMemberIds).toHaveBeenCalledWith(COOKBOOK_ID, { kind: "manual" });
     expectNoRecipeWrites();
   });
 

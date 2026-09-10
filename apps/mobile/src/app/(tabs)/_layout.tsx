@@ -24,7 +24,7 @@ function isIOS26OrLater(): boolean {
 
 // Which tab the user is currently on, based on URL segments.
 // segments[1] is the tab name inside (tabs): 'dashboard' | 'groceries' | 'search' | etc.
-type ActiveTab = "dashboard" | "groceries" | "search" | "calendar" | "profile";
+type ActiveTab = "dashboard" | "groceries" | "search" | "calendar" | "collections" | "profile";
 
 function useActiveTab(): { tab: ActiveTab; isRecipeDetail: boolean } {
   const segments = useSegments();
@@ -121,6 +121,15 @@ export default function TabsLayout() {
             md="calendar_month"
           />
           <NativeTabs.Trigger.Label>Calendar</NativeTabs.Trigger.Label>
+        </NativeTabs.Trigger>
+
+        {/* Collections tab */}
+        <NativeTabs.Trigger name="collections">
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "rectangle.stack", selected: "rectangle.stack.fill" }}
+            md="collections_bookmark"
+          />
+          <NativeTabs.Trigger.Label>Collections</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
 
         {/* Profile tab */}
