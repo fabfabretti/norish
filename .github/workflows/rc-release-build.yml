@@ -25,6 +25,9 @@ jobs:
     name: Quality
     uses: ./.github/workflows/_node-ci.yml
     secrets: inherit
+    with:
+      # E2E is covered by the Docker build test; skip here to save ~2-3 min.
+      skip-e2e: true
 
   prepare-release:
     name: Create RC tag

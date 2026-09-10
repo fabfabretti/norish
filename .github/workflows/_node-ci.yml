@@ -10,6 +10,12 @@ env:
 
 on:
   workflow_call:
+    inputs:
+      skip-e2e:
+        description: "Skip E2E tests and their setup (Playwright, uv, parser runtime). Use when the caller already covers E2E elsewhere."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -89,22 +95,22 @@ jobs:
         run: pnpm run build
 
       - name: Install Playwright browsers
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && !inputs.skip-e2e }}
         run: pnpm --filter @norish/web exec playwright install --with-deps chromium
 
       # setup-uv stopped publishing floating major tags with v8; pin exactly.
       - name: Install uv
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && !inputs.skip-e2e }}
         uses: astral-sh/setup-uv@v10.0.1
 
       # The production server boots the embedded parser and refuses to run
       # without its runtime; the shared setup skips it for everything else.
       - name: Install the embedded parser runtime
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && !inputs.skip-e2e }}
         run: pnpm --filter @norish/parser-api run install:deps
 
       - name: Browser E2E
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && !inputs.skip-e2e }}
         run: pnpm --filter @norish/web run test:e2e
 
       - name: Upload traces and results on failure

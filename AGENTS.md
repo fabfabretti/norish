@@ -42,6 +42,7 @@ sections (never passing a finished prompt string — ADR-0016).
 
 ## Working Conventions
 
+- **Never build or run the app locally via pnpm or bare node.** CI builds every image on GitHub Actions and pushes to GHCR. Local work uses pre-built images: `docker compose -f docker/compose.base.yaml -f docker/compose.local.yaml up -d`. The `pnpm run build` / `pnpm run dev` commands exist for the devcontainer only.
 - Keep root scripts and config minimal; workspace ownership should stay inside the owning app, package, or tooling workspace.
 - Prefer existing shared abstractions before adding new ones.
 - Use `@/` imports where the workspace already supports them.

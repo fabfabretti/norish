@@ -92,7 +92,7 @@ RUN --mount=type=cache,target=/root/.local/share/uv/python \
 # injected workspace deps include non-package.json files (tsconfig presets,
 # source files, message JSON, etc.) before the build runs.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-  pnpm install --frozen-lockfile --ignore-scripts --child-concurrency=1
+  pnpm install --frozen-lockfile --ignore-scripts
 
 RUN --mount=type=cache,target=/root/.cache/uv \
   --mount=type=cache,target=/root/.local/share/uv/python \
