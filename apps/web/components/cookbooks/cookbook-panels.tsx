@@ -125,10 +125,13 @@ export function CookbookEditPanel({
   // Both staged edits commit through the same seam: routing only the rename
   // back out through a prop would give one panel two ways to write.
   const { renameCookbook, setMembership } = useCookbooksMutations();
+  // A smart cookbook's members come from its rule, so there is nothing to
+  // unfile here — the row list below has to know that before it renders.
+  const isSmart = cookbook.rule?.kind === "tags";
   const { recipes, isLoading, hasMore, loadMore, removeMember } = useCookbookRecipesQuery(
     cookbookId,
     {},
-    { enabled: open }
+    { enabled: open && !isSmart }
   );
 
   useEffect(() => {
@@ -189,59 +192,65 @@ export function CookbookEditPanel({
             }}
           />
 
-          <Separator className="bg-surface-tertiary/40 my-3" />
-
-          <Label className="text-muted mb-2 text-[11px] font-medium tracking-wide uppercase">
-            {t("membersLabel")}
-          </Label>
-
-          {isLoading ? (
-            <div className="flex flex-1 items-center justify-center py-6">
-              <Spinner color="accent" size="sm" />
-            </div>
-          ) : recipes.length === 0 ? (
-            <div className="text-muted flex flex-1 items-center justify-center px-4 text-center text-base">
-              {t("empty")}
-            </div>
+          {isSmart ? (
+            <p className="text-muted mt-3 text-sm">{t("smartMembersNote")}</p>
           ) : (
-            <div className="divide-border/40 flex min-h-0 flex-1 flex-col divide-y overflow-y-auto">
-              {recipes.map((recipe) => {
-                const stays = !removed.includes(recipe.id);
+            <>
+              <Separator className="bg-surface-tertiary/40 my-3" />
 
-                return (
-                  <SelectableRow
-                    key={recipe.id}
-                    data-remove-member={recipe.name}
-                    isSelected={stays}
-                    media={
-                      recipe.image ? (
-                        <img
-                          alt=""
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          src={recipe.image}
-                        />
-                      ) : (
-                        <PhotoIcon aria-hidden className="h-5 w-5 opacity-70" />
-                      )
-                    }
-                    title={recipe.name}
-                    onToggle={() => toggleRemoved(recipe.id)}
-                  />
-                );
-              })}
+              <Label className="text-muted mb-2 text-[11px] font-medium tracking-wide uppercase">
+                {t("membersLabel")}
+              </Label>
 
-              {hasMore && (
-                <Button
-                  className="mt-2 self-center"
-                  size="sm"
-                  variant="tertiary"
-                  onPress={loadMore}
-                >
-                  {t("showMore")}
-                </Button>
+              {isLoading ? (
+                <div className="flex flex-1 items-center justify-center py-6">
+                  <Spinner color="accent" size="sm" />
+                </div>
+              ) : recipes.length === 0 ? (
+                <div className="text-muted flex flex-1 items-center justify-center px-4 text-center text-base">
+                  {t("empty")}
+                </div>
+              ) : (
+                <div className="divide-border/40 flex min-h-0 flex-1 flex-col divide-y overflow-y-auto">
+                  {recipes.map((recipe) => {
+                    const stays = !removed.includes(recipe.id);
+
+                    return (
+                      <SelectableRow
+                        key={recipe.id}
+                        data-remove-member={recipe.name}
+                        isSelected={stays}
+                        media={
+                          recipe.image ? (
+                            <img
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              src={recipe.image}
+                            />
+                          ) : (
+                            <PhotoIcon aria-hidden className="h-5 w-5 opacity-70" />
+                          )
+                        }
+                        title={recipe.name}
+                        onToggle={() => toggleRemoved(recipe.id)}
+                      />
+                    );
+                  })}
+
+                  {hasMore && (
+                    <Button
+                      className="mt-2 self-center"
+                      size="sm"
+                      variant="tertiary"
+                      onPress={loadMore}
+                    >
+                      {t("showMore")}
+                    </Button>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </Panel.Body>
       ) : null}

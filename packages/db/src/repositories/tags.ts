@@ -42,6 +42,46 @@ export async function listTagNamesForUsers(userIds: string[]): Promise<string[]>
   return rows.map((r) => r.name).filter(Boolean);
 }
 
+/**
+ * Every tag used by at least one recipe, id included — the smart cookbook
+ * rule editor's vocabulary (rules are written in ids, not names).
+ */
+export async function listAllTags(): Promise<TagDto[]> {
+  // Distinct: a tag used by several recipes joins once per recipe, and the
+  // editor should offer each tag once.
+  const rows = await db
+    .selectDistinct()
+    .from(tags)
+    .innerJoin(recipeTags, eq(tags.id, recipeTags.tagId))
+    .orderBy(sql`lower(${tags.name})`)
+    .then((joined) => joined.map((r) => r.tags));
+
+  const parsed = TagArraySchema.safeParse(rows);
+
+  return parsed.success ? parsed.data : [];
+}
+
+/**
+ * Tags used by recipes owned by the given users — the same scope as the
+ * names-only read, with the ids the rule editor stores.
+ */
+export async function listTagsForUsers(userIds: string[]): Promise<TagDto[]> {
+  if (!userIds.length) return [];
+
+  const rows = await db
+    .selectDistinct()
+    .from(tags)
+    .innerJoin(recipeTags, eq(tags.id, recipeTags.tagId))
+    .innerJoin(recipes, eq(recipeTags.recipeId, recipes.id))
+    .where(inArray(recipes.userId, userIds))
+    .orderBy(sql`lower(${tags.name})`)
+    .then((joined) => joined.map((r) => r.tags));
+
+  const parsed = TagArraySchema.safeParse(rows);
+
+  return parsed.success ? parsed.data : [];
+}
+
 function ensureNonEmptyName(name: string): string {
   const cleaned = stripHtmlTags(name);
 

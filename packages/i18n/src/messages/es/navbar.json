@@ -31,7 +31,8 @@
   "nav": {
     "home": "Recetas",
     "calendar": "Calendario",
-    "groceries": "Ingredientes"
+    "groceries": "Ingredientes",
+    "collections": "Collections"
   },
   "mobile": {
     "searchPlaceholder": "Buscar recetas...",

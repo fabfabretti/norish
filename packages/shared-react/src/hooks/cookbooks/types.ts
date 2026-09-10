@@ -1,6 +1,6 @@
 import type { InfiniteData, QueryKey } from "@tanstack/react-query";
 
-import type { CookbookSummaryDTO, SortOrder } from "@norish/shared/contracts";
+import type { CookbookRuleDTO, CookbookSummaryDTO, SortOrder } from "@norish/shared/contracts";
 
 import type { CreateRecipeHooksOptions } from "../recipes/types";
 
@@ -50,8 +50,15 @@ export type CookbooksCacheHelpers = {
 
 export type CookbooksMutationsResult = {
   /** Resolves with the cookbook's id — client-minted, so it is known up front. */
-  createCookbook: (input: { title: string; recipeId?: string }) => Promise<string>;
+  createCookbook: (input: {
+    title: string;
+    recipeId?: string;
+    /** Give it a tag rule and the cookbook is smart: its members are derived. */
+    rule?: CookbookRuleDTO;
+  }) => Promise<string>;
   renameCookbook: (input: { id: string; title: string; version: number }) => void;
+  /** Re-point a smart cookbook's rule (or undo smartness to `{ kind: "manual" }`). */
+  updateRule: (input: { id: string; version: number; rule: CookbookRuleDTO }) => void;
   deleteCookbook: (input: { id: string; version: number }) => void;
   /** File a recipe into a cookbook, or take it out — the same call both ways. */
   setMembership: (input: {

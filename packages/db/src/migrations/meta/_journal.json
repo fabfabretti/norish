@@ -309,6 +309,13 @@
       "when": 1788354876718,
       "tag": "0043_site_auth_token_account",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789049540590,
+      "tag": "0044_cookbook_rules",
+      "breakpoints": true
     }
   ]
 }

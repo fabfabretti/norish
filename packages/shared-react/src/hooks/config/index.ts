@@ -3,6 +3,7 @@ import { createUseCuisinesQuery } from "./use-cuisines-query";
 import { createUseLocaleConfigQuery } from "./use-locale-config-query";
 import { createUseRecurrenceConfigQuery } from "./use-recurrence-config-query";
 import { createUseTagsQuery } from "./use-tags-query";
+import { createUseTagCatalogQuery } from "./use-tag-catalog-query";
 import { createUseTimerKeywordsQuery } from "./use-timer-keywords-query";
 import { createUseTimersEnabledBaseQuery } from "./use-timers-enabled-base-query";
 import { createUseUnitsQuery } from "./use-units-query";
@@ -19,6 +20,7 @@ export type {
 export { normalizeLocaleConfig } from "./normalize-locale-config";
 export { createUseLocaleConfigQuery } from "./use-locale-config-query";
 export { createUseTagsQuery } from "./use-tags-query";
+export { createUseTagCatalogQuery } from "./use-tag-catalog-query";
 export { createUseCuisinesQuery } from "./use-cuisines-query";
 export { createUseUnitsQuery } from "./use-units-query";
 export { createUseRecurrenceConfigQuery } from "./use-recurrence-config-query";
@@ -31,6 +33,7 @@ export function createConfigHooks(options: CreateConfigHooksOptions) {
   return {
     useLocaleConfigQuery: createUseLocaleConfigQuery(options),
     useTagsQuery: createUseTagsQuery(options),
+    useTagCatalogQuery: createUseTagCatalogQuery(options),
     useCuisinesQuery: createUseCuisinesQuery(options),
     useUnitsQuery: createUseUnitsQuery(options),
     useRecurrenceConfigQuery: createUseRecurrenceConfigQuery(options),

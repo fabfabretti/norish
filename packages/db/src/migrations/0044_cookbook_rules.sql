@@ -1,0 +1,1 @@
+ALTER TABLE "cookbooks" ADD COLUMN "rule" jsonb DEFAULT '{"kind":"manual"}'::jsonb NOT NULL;

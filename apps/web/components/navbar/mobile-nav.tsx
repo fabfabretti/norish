@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import NavbarUserMenu from "@/components/navbar/navbar-user-menu";
 import { useAutoHide } from "@/hooks/auto-hide";
 import {
+  BuildingLibraryIcon,
   CalendarDaysIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
@@ -18,10 +19,11 @@ import { cssFloatingDockEndCap, MOBILE_NAV_SHRUNKEN_SCALE } from "@norish/web/co
 import { siteConfig } from "@norish/web/config/site";
 
 // Map hrefs to translation keys (same as navbar.tsx)
-const navLabelKeys: Record<string, "home" | "calendar" | "groceries"> = {
+const navLabelKeys: Record<string, "home" | "calendar" | "groceries" | "collections"> = {
   "/": "home",
   "/groceries": "groceries",
   "/calendar": "calendar",
+  "/collections": "collections",
 };
 
 // Both floating pieces share one solid treatment on the chrome tokens — the
@@ -98,7 +100,9 @@ export const MobileNav = () => {
                     ? HomeIcon
                     : item.href.startsWith("/calendar")
                       ? CalendarDaysIcon
-                      : ClipboardDocumentListIcon;
+                      : item.href.startsWith("/collections")
+                        ? BuildingLibraryIcon
+                        : ClipboardDocumentListIcon;
                 const label = tNav(navLabelKeys[item.href] ?? "home");
 
                 return (

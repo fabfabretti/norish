@@ -13,11 +13,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cookbookEmitter } from "../mocks/cookbook-emitter";
 import {
+  addRecipeToCookbook,
   createCookbook,
   deleteCookbookById,
   getCookbookRow,
   listCookbooks,
   renameCookbook,
+  updateCookbookRule,
   withMemberSummaries,
 } from "../mocks/cookbooks-repository";
 import { canAccessResource } from "../mocks/permissions";
@@ -37,6 +39,8 @@ const { cookbooksRouter } = await import("../../src/routers/cookbooks");
 const { router, createCallerFactory } = await import("../../src/trpc");
 
 const appRouter = router({ cookbooks: cookbooksRouter });
+
+const TAG_ID = "44444444-4444-4444-8444-444444444444";
 
 function callerFor(user = createMockUser()) {
   const household = createMockHousehold();
@@ -59,6 +63,7 @@ function cookbookRow(overrides: Record<string, unknown> = {}) {
     id: "11111111-1111-4111-8111-111111111111",
     userId: "test-user-id",
     title: "Weeknights",
+    rule: { kind: "manual" },
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     version: 1,
@@ -88,12 +93,33 @@ describe("cookbook procedures", () => {
         id: undefined,
         userId: "test-user-id",
         title: "Weeknights",
+        rule: undefined,
       });
       expect(result.id).toBe(summary.id);
       // The default mocked policy is `household`, so the echo goes there.
       expect(cookbookEmitter.emitToHousehold).toHaveBeenCalledWith("test-household-id", "created", {
         cookbook: summary,
       });
+    });
+
+    it("stores a tag rule and files no starting recipe into it", async () => {
+      const rule = { kind: "tags", tagIds: [TAG_ID], matchMode: "AND" };
+
+      const summary = cookbookSummary({ rule });
+
+      createCookbook.mockResolvedValue(summary);
+
+      const { caller } = callerFor();
+      const result = await caller.cookbooks.create({ title: "Dinners", rule });
+
+      expect(createCookbook).toHaveBeenCalledWith({
+        id: undefined,
+        userId: "test-user-id",
+        title: "Dinners",
+        rule,
+      });
+      expect(addRecipeToCookbook).not.toHaveBeenCalled();
+      expect(result.rule).toEqual(rule);
     });
 
     it("honours a client-minted id, so filing queued behind it lands", async () => {
@@ -187,6 +213,77 @@ describe("cookbook procedures", () => {
 
       await expect(
         caller.cookbooks.rename({ id: row.id, version: 1, title: "Too late" })
+      ).resolves.toBeNull();
+      expect(cookbookEmitter.emitToHousehold).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateRule", () => {
+    it("asks the policy for edit rights and swaps the rule in when granted", async () => {
+      const row = cookbookRow({ userId: "someone-else" });
+      const rule = { kind: "tags", tagIds: [TAG_ID], matchMode: "OR" };
+
+      getCookbookRow.mockResolvedValue(row);
+      canAccessResource.mockResolvedValue(true);
+      updateCookbookRule.mockResolvedValue({
+        applied: true,
+        stale: false,
+        value: { ...row, rule, version: 2 },
+      });
+      withMemberSummaries.mockResolvedValue([
+        cookbookSummary({ userId: "someone-else", rule, version: 2 }),
+      ]);
+
+      const { caller } = callerFor();
+      const result = await caller.cookbooks.updateRule({ id: row.id, version: 1, rule });
+
+      expect(canAccessResource).toHaveBeenCalledWith(
+        "edit",
+        "test-user-id",
+        "someone-else",
+        ["test-user-id", "household-member-id"],
+        false
+      );
+      expect(updateCookbookRule).toHaveBeenCalledWith(row.id, 1, rule);
+      expect(result?.rule).toEqual(rule);
+      expect(cookbookEmitter.emitToHousehold).toHaveBeenCalledWith(
+        "test-household-id",
+        "updated",
+        expect.objectContaining({ cookbook: expect.objectContaining({ rule }) })
+      );
+    });
+
+    it("refuses a reader the policy will not let edit", async () => {
+      getCookbookRow.mockResolvedValue(cookbookRow({ userId: "someone-else" }));
+      canAccessResource.mockResolvedValue(false);
+
+      const { caller } = callerFor();
+
+      await expect(
+        caller.cookbooks.updateRule({
+          id: cookbookRow().id,
+          version: 1,
+          rule: { kind: "manual" },
+        })
+      ).rejects.toThrow(TRPCError);
+      expect(updateCookbookRule).not.toHaveBeenCalled();
+    });
+
+    it("drops a stale rule change rather than clobbering a concurrent one", async () => {
+      const row = cookbookRow();
+
+      getCookbookRow.mockResolvedValue(row);
+      canAccessResource.mockResolvedValue(true);
+      updateCookbookRule.mockResolvedValue({ applied: false, stale: true });
+
+      const { caller } = callerFor();
+
+      await expect(
+        caller.cookbooks.updateRule({
+          id: row.id,
+          version: 1,
+          rule: { kind: "tags", tagIds: [TAG_ID], matchMode: "AND" },
+        })
       ).resolves.toBeNull();
       expect(cookbookEmitter.emitToHousehold).not.toHaveBeenCalled();
     });

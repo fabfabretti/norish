@@ -1,7 +1,7 @@
 import type { SQL } from "drizzle-orm";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 
-import type { CookbookSummaryDTO } from "@norish/shared/contracts";
+import type { CookbookRuleDTO, CookbookSummaryDTO } from "@norish/shared/contracts";
 import type { SortOrder } from "@norish/shared/contracts/store-types";
 import { db } from "@norish/db/drizzle";
 
@@ -10,7 +10,11 @@ import type { RecipeListContext } from "./recipes";
 import { cookbookRecipes, cookbooks, recipes, recipeTags, tags } from "../schema";
 import { COOKBOOK_DESCRIPTION_TITLE_LIMIT, CookbookSummarySchema } from "../zodSchemas";
 import { appliedOutcome, staleOutcome } from "./mutation-outcomes";
-import { buildOwnerPolicyCondition, PRIMARY_IMAGE_SQL } from "./recipes";
+import {
+  buildOwnerPolicyCondition,
+  matchTagRuleRecipeIds,
+  PRIMARY_IMAGE_SQL,
+} from "./recipes";
 
 /** How many member images the derived cover mosaic asks for. */
 const COVER_TILE_COUNT = 4;
@@ -59,6 +63,7 @@ type CookbookRow = {
   id: string;
   userId: string | null;
   title: string;
+  rule: CookbookRuleDTO;
   createdAt: Date;
   updatedAt: Date;
   version: number;
@@ -68,6 +73,7 @@ const COOKBOOK_COLUMNS = {
   id: cookbooks.id,
   userId: cookbooks.userId,
   title: cookbooks.title,
+  rule: cookbooks.rule,
   createdAt: cookbooks.createdAt,
   updatedAt: cookbooks.updatedAt,
   version: cookbooks.version,
@@ -123,30 +129,50 @@ export function cookbookTitleMatch(search: string) {
  * cap drops whichever tags it orders last, and the whole point of this field
  * is a warning that must not go missing.
  *
- * Ordered by the column itself rather than by `lower()`, which `SELECT
- * DISTINCT` would refuse for not being in the select list.
+ * Reads the members of both kinds of cookbook through one `recipeTags` pass,
+ * so a smart cookbook gathers the tags its derived members carry exactly as a
+ * manual one gathers its filed members' tags.
  */
 async function memberTags(
-  cookbookIds: string[],
+  members: Map<string, string[]>,
   policyCondition: SQL | undefined
 ): Promise<Map<string, string[]>> {
   const byCookbook = new Map<string, string[]>();
-  const membership = inArray(cookbookRecipes.cookbookId, cookbookIds);
+  const allRecipeIds = Array.from(new Set(Array.from(members.values()).flat()));
+
+  if (allRecipeIds.length === 0) return byCookbook;
 
   const rows = await db
-    .selectDistinct({ cookbookId: cookbookRecipes.cookbookId, name: tags.name })
-    .from(cookbookRecipes)
-    .innerJoin(recipes, eq(cookbookRecipes.recipeId, recipes.id))
-    .innerJoin(recipeTags, eq(recipeTags.recipeId, recipes.id))
+    .selectDistinct({ recipeId: recipeTags.recipeId, name: tags.name })
+    .from(recipeTags)
+    .innerJoin(recipes, eq(recipeTags.recipeId, recipes.id))
     .innerJoin(tags, eq(recipeTags.tagId, tags.id))
-    .where(policyCondition ? and(membership, policyCondition) : membership)
+    .where(
+      policyCondition
+        ? and(inArray(recipeTags.recipeId, allRecipeIds), policyCondition)
+        : inArray(recipeTags.recipeId, allRecipeIds)
+    )
     .orderBy(asc(tags.name));
 
+  const namesByRecipe = new Map<string, string[]>();
+
   for (const row of rows) {
-    const names = byCookbook.get(row.cookbookId) ?? [];
+    const names = namesByRecipe.get(row.recipeId) ?? [];
 
     names.push(row.name);
-    byCookbook.set(row.cookbookId, names);
+    namesByRecipe.set(row.recipeId, names);
+  }
+
+  for (const [cookbookId, recipeIds] of members) {
+    const seen = new Set<string>();
+
+    for (const recipeId of recipeIds) {
+      for (const name of namesByRecipe.get(recipeId) ?? []) {
+        seen.add(name);
+      }
+    }
+
+    byCookbook.set(cookbookId, [...seen].sort());
   }
 
   return byCookbook;
@@ -157,65 +183,121 @@ async function memberTags(
  * can see, the first few of their primary images for the derived cover, and
  * the handful of derived facts a card states about the set as a whole.
  *
- * One membership join under the same view-policy condition the recipe list
- * applies, so the count and the list agree by construction and two readers
- * may honestly see two different counts (ADR-0027). Images resolve through
- * the same gallery-first SQL recipes use, so the deprecated scalar is never
- * read directly. Ordered by the member's own creation time so the mosaic and
- * the derived description are stable between reads.
+ * Both membership sources route through one policy-conditioned recipe read,
+ * so the count and the list agree by construction and two readers may
+ * honestly see two different counts (ADR-0027). Manual cookbooks read the
+ * join table; a smart cookbook's members are the recipes its tag rule matches
+ * at read time. Images resolve through the same gallery-first SQL recipes
+ * use, so the deprecated scalar is never read directly. Ordered by the
+ * member's own creation time so the mosaic and the derived description are
+ * stable between reads.
  */
 async function memberSummaries(
   ctx: RecipeListContext,
-  cookbookIds: string[]
+  rows: CookbookRow[]
 ): Promise<Map<string, MemberSummary>> {
   const summaries = new Map<string, MemberSummary>();
 
-  if (cookbookIds.length === 0) return summaries;
+  if (rows.length === 0) return summaries;
 
   const policyCondition = await buildOwnerPolicyCondition(ctx, recipes.userId, "view");
-  const membership = inArray(cookbookRecipes.cookbookId, cookbookIds);
+  const manualIds = rows.filter((row) => row.rule.kind === "manual").map((row) => row.id);
+  const smartRows = rows.filter(
+    (row): row is CookbookRow & { rule: Extract<CookbookRuleDTO, { kind: "tags" }> } =>
+      row.rule.kind === "tags"
+  );
 
-  const [rows, tagsByCookbook] = await Promise.all([
-    db
+  // cookbookId -> member recipe ids, gathered from whichever source the rule
+  // says a cookbook is made of.
+  const members = new Map<string, string[]>();
+
+  for (const id of manualIds) members.set(id, []);
+  for (const row of smartRows) members.set(row.id, []);
+
+  if (manualIds.length > 0) {
+    const membership = inArray(cookbookRecipes.cookbookId, manualIds);
+
+    const rows = await db
       .select({
         cookbookId: cookbookRecipes.cookbookId,
-        image: PRIMARY_IMAGE_SQL,
-        name: recipes.name,
-        servings: recipes.servings,
-        minutes: MEMBER_MINUTES_SQL,
+        recipeId: cookbookRecipes.recipeId,
       })
       .from(cookbookRecipes)
+      // The policy condition reads the recipe's owner, so the join stays even
+      // though only the pair is selected (ADR-0027).
       .innerJoin(recipes, eq(cookbookRecipes.recipeId, recipes.id))
-      .where(policyCondition ? and(membership, policyCondition) : membership)
-      .orderBy(asc(recipes.createdAt), asc(recipes.id)),
-    memberTags(cookbookIds, policyCondition),
-  ]);
+      .where(policyCondition ? and(membership, policyCondition) : membership);
 
-  for (const row of rows) {
-    const entry = summaries.get(row.cookbookId) ?? emptyMemberSummary();
+    for (const row of rows) {
+      members.get(row.cookbookId)?.push(row.recipeId);
+    }
+  }
 
-    entry.memberCount += 1;
+  if (smartRows.length > 0) {
+    // Derived, not stored: matching the whole recipe-to-tag map once serves
+    // every smart cookbook on the page. (ponytail: in-memory over a pure-SQL
+    // GROUP BY ... HAVING count; a per-tag EXISTS query is the upgrade if a
+    // household grows into thousands of recipes.)
+    for (const row of smartRows) {
+      members.set(row.id, await matchTagRuleRecipeIds(row.rule));
+    }
+  }
 
-    if (row.image && entry.coverImages.length < COVER_TILE_COUNT) {
-      entry.coverImages.push(row.image);
+  const allRecipeIds = Array.from(new Set(Array.from(members.values()).flat()));
+  const detailRows =
+    allRecipeIds.length > 0
+      ? await db
+          .select({
+            recipeId: recipes.id,
+            image: PRIMARY_IMAGE_SQL,
+            name: recipes.name,
+            servings: recipes.servings,
+            minutes: MEMBER_MINUTES_SQL,
+          })
+          .from(recipes)
+          .where(
+            policyCondition
+              ? and(inArray(recipes.id, allRecipeIds), policyCondition)
+              : inArray(recipes.id, allRecipeIds)
+          )
+          .orderBy(asc(recipes.createdAt), asc(recipes.id))
+      : [];
+
+  const detailById = new Map(detailRows.map((row) => [row.recipeId, row]));
+
+  const [tagsByCookbook] = await Promise.all([memberTags(members, policyCondition)]);
+
+  for (const [cookbookId, recipeIds] of members) {
+    const entry = emptyMemberSummary();
+
+    for (const recipeId of recipeIds) {
+      const row = detailById.get(recipeId);
+
+      if (!row) continue;
+
+      entry.memberCount += 1;
+
+      if (row.image && entry.coverImages.length < COVER_TILE_COUNT) {
+        entry.coverImages.push(row.image);
+      }
+
+      if (entry.memberTitles.length < COOKBOOK_DESCRIPTION_TITLE_LIMIT) {
+        entry.memberTitles.push(row.name);
+      }
+
+      const minutes = row.minutes === null ? null : Number(row.minutes);
+
+      if (minutes !== null && Number.isFinite(minutes)) {
+        entry.totalMinutes = (entry.totalMinutes ?? 0) + minutes;
+      }
+
+      if (row.servings > 0) {
+        entry.minServings =
+          entry.minServings === null ? row.servings : Math.min(entry.minServings, row.servings);
+      }
     }
 
-    if (entry.memberTitles.length < COOKBOOK_DESCRIPTION_TITLE_LIMIT) {
-      entry.memberTitles.push(row.name);
-    }
-
-    const minutes = row.minutes === null ? null : Number(row.minutes);
-
-    if (minutes !== null && Number.isFinite(minutes)) {
-      entry.totalMinutes = (entry.totalMinutes ?? 0) + minutes;
-    }
-
-    if (row.servings > 0) {
-      entry.minServings =
-        entry.minServings === null ? row.servings : Math.min(entry.minServings, row.servings);
-    }
-
-    summaries.set(row.cookbookId, entry);
+    summaries.set(cookbookId, entry);
   }
 
   for (const [cookbookId, names] of tagsByCookbook) {
@@ -245,10 +327,7 @@ export async function withMemberSummaries(
   ctx: RecipeListContext,
   rows: CookbookRow[]
 ): Promise<CookbookSummaryDTO[]> {
-  const members = await memberSummaries(
-    ctx,
-    rows.map((row) => row.id)
-  );
+  const members = await memberSummaries(ctx, rows);
 
   return rows.map((row) => toCookbookSummary(row, members.get(row.id)));
 }
@@ -290,10 +369,16 @@ export async function createCookbook(input: {
   id?: string;
   userId: string;
   title: string;
+  rule?: CookbookRuleDTO;
 }): Promise<CookbookSummaryDTO> {
   const [row] = await db
     .insert(cookbooks)
-    .values({ ...(input.id ? { id: input.id } : {}), userId: input.userId, title: input.title })
+    .values({
+      ...(input.id ? { id: input.id } : {}),
+      userId: input.userId,
+      title: input.title,
+      rule: input.rule ?? { kind: "manual" },
+    })
     .returning(COOKBOOK_COLUMNS);
 
   if (!row) throw new Error("Failed to create cookbook");
@@ -309,6 +394,30 @@ export async function renameCookbook(
   const [row] = await db
     .update(cookbooks)
     .set({ title, updatedAt: new Date(), version: sql`${cookbooks.version} + 1` })
+    .where(and(eq(cookbooks.id, id), eq(cookbooks.version, version)))
+    .returning(COOKBOOK_COLUMNS);
+
+  if (!row) return staleOutcome();
+
+  return appliedOutcome(row);
+}
+
+/**
+ * Turn a cookbook's rule into a new one under the same optimistic
+ * concurrency a rename uses.
+ *
+ * A smart cookbook is rule-editable and nothing else: this is what replaces
+ * the membership panel for it, and "manual" here means an empty set until it
+ * is filed into by hand.
+ */
+export async function updateCookbookRule(
+  id: string,
+  version: number,
+  rule: CookbookRuleDTO
+): Promise<MutationOutcome<CookbookRow>> {
+  const [row] = await db
+    .update(cookbooks)
+    .set({ rule, updatedAt: new Date(), version: sql`${cookbooks.version} + 1` })
     .where(and(eq(cookbooks.id, id), eq(cookbooks.version, version)))
     .returning(COOKBOOK_COLUMNS);
 
@@ -443,7 +552,12 @@ export async function listEditableCookbooks(ctx: RecipeListContext): Promise<Coo
     .where(policyCondition)
     .orderBy(asc(cookbooks.title));
 
-  return withMemberSummaries(ctx, rows);
+  // Only a hand-curated cookbook can hold a filed recipe: a smart one derives
+  // its members from its rule, so offering it in the file-in panel would let
+  // a choice fight the tag match.
+  const manualRows = rows.filter((row) => row.rule.kind === "manual");
+
+  return withMemberSummaries(ctx, manualRows);
 }
 
 /**
@@ -465,7 +579,16 @@ export async function removeRecipeFromCookbook(
 }
 
 /** Which of these recipes this cookbook holds — the membership toggles. */
-export async function listCookbookMemberIds(cookbookId: string): Promise<string[]> {
+export async function listCookbookMemberIds(
+  cookbookId: string,
+  rule: CookbookRuleDTO = { kind: "manual" }
+): Promise<string[]> {
+  // A smart cookbook has no filed members: the ids are what its rule matches
+  // right now, so a bulk-fill reader sees the same set the page would.
+  if (rule.kind === "tags") {
+    return matchTagRuleRecipeIds(rule);
+  }
+
   const rows = await db
     .select({ recipeId: cookbookRecipes.recipeId })
     .from(cookbookRecipes)

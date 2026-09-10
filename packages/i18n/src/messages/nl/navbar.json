@@ -31,7 +31,8 @@
   "nav": {
     "home": "Recepten",
     "calendar": "Kalender",
-    "groceries": "Boodschappen"
+    "groceries": "Boodschappen",
+    "collections": "Collections"
   },
   "mobile": {
     "searchPlaceholder": "Zoek recepten...",

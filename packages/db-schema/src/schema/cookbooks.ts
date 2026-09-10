@@ -1,8 +1,20 @@
-import { index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 import { users } from "./auth";
 import { recipes } from "./recipes";
 import { mutableRowColumns } from "./shared";
+
+/**
+ * What makes a cookbook automatic rather than hand-filed.
+ *
+ * `"manual"` is the default and every cookbook pre-dating this column; a
+ * smart cookbook carries the tag rule its members are derived from. The same
+ * `matchMode` the recipe list already understands (AND/OR) decides whether a
+ * recipe needs every chosen tag or any of them.
+ */
+export type CookbookRule =
+  | { kind: "manual" }
+  | { kind: "tags"; tagIds: string[]; matchMode: "AND" | "OR" };
 
 /**
  * A Cookbook: a titled set of recipes, and nothing else.
@@ -25,6 +37,12 @@ export const cookbooks = pgTable(
       onDelete: "set null",
     }),
     title: text("title").notNull(),
+    /**
+     * NULL-free: every cookbook is described by a rule, and `"manual"` is the
+     * rule a hand-curated set carries. Smart membership is derived from this
+     * at read time, so recipe or tag edits update the set with no backfill.
+     */
+    rule: jsonb("rule").$type<CookbookRule>().notNull().default({ kind: "manual" }),
     ...mutableRowColumns,
   },
   (t) => [

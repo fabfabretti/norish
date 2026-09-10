@@ -1,4 +1,5 @@
 export { useTagsQuery } from "./use-tags-query";
+export { useTagCatalogQuery } from "./use-tag-catalog-query";
 export { useCuisinesQuery } from "./use-cuisines-query";
 export { useUnitsQuery } from "./use-units-query";
 export { useTimersEnabledQuery } from "./use-timers-enabled-query";

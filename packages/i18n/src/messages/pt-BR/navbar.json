@@ -31,7 +31,8 @@
   "nav": {
     "home": "Receitas",
     "calendar": "Calendário",
-    "groceries": "Compras"
+    "groceries": "Compras",
+    "collections": "Collections"
   },
   "mobile": {
     "searchPlaceholder": "Buscar receitas...",

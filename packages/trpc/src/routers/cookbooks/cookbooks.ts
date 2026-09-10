@@ -7,6 +7,7 @@ import {
   getCookbookForViewer,
   listCookbooks,
   renameCookbook,
+  updateCookbookRule,
   withMemberSummaries,
 } from "@norish/db/repositories/cookbooks";
 import { trpcLogger as log } from "@norish/shared-server/logger";
@@ -17,6 +18,7 @@ import {
   CookbookListInputSchema,
   CookbookListResultSchema,
   CookbookRenameInputSchema,
+  CookbookRuleUpdateInputSchema,
   CookbookSummarySchema,
 } from "@norish/shared/contracts/zod";
 
@@ -63,7 +65,8 @@ const create = authedProcedure
     // A cookbook made from a recipe holds it from the first moment, so
     // "these two belong together" is one step. Only view rights on the
     // recipe are needed, and the recipe itself is not written (ADR-0027).
-    if (input.recipeId) {
+    // A smart cookbook cannot be filed into, so there is nothing to assert.
+    if (input.recipeId && (input.rule?.kind ?? "manual") === "manual") {
       await assertRecipeAccess(ctx, input.recipeId, "view");
     }
 
@@ -71,26 +74,30 @@ const create = authedProcedure
       id: input.id,
       userId: ctx.user.id,
       title: input.title,
+      rule: input.rule,
     });
 
-    if (input.recipeId) {
-      await addRecipeToCookbook(cookbook.id, input.recipeId);
+    const isSmart = cookbook.rule.kind === "tags";
+    const withInitialRecipe = !isSmart && Boolean(input.recipeId);
+
+    if (withInitialRecipe) {
+      await addRecipeToCookbook(cookbook.id, input.recipeId!);
     }
 
     log.info({ userId: ctx.user.id, cookbookId: cookbook.id }, "Cookbook created");
     await emitCookbookEvent(ctx, "created", {
-      cookbook: input.recipeId ? { ...cookbook, memberCount: 1 } : cookbook,
+      cookbook: withInitialRecipe ? { ...cookbook, memberCount: 1 } : cookbook,
     });
 
-    if (input.recipeId) {
+    if (withInitialRecipe) {
       await emitCookbookEvent(ctx, "membershipChanged", {
         cookbookId: cookbook.id,
-        recipeId: input.recipeId,
+        recipeId: input.recipeId!,
         isMember: true,
       });
     }
 
-    return input.recipeId ? { ...cookbook, memberCount: 1 } : cookbook;
+    return withInitialRecipe ? { ...cookbook, memberCount: 1 } : cookbook;
   });
 
 const rename = authedProcedure
@@ -117,6 +124,35 @@ const rename = authedProcedure
     if (!cookbook) return null;
 
     log.info({ userId: ctx.user.id, cookbookId: cookbook.id }, "Cookbook renamed");
+    await emitCookbookEvent(ctx, "updated", { cookbook });
+
+    return cookbook;
+  });
+
+const updateRule = authedProcedure
+  .input(CookbookRuleUpdateInputSchema)
+  .output(CookbookSummarySchema.nullable())
+  .mutation(async ({ ctx, input }) => {
+    await assertCookbookAccess(ctx, input.id, "edit");
+
+    const outcome = await updateCookbookRule(input.id, input.version, input.rule);
+
+    if (outcome.stale || !outcome.value) {
+      log.info(
+        { userId: ctx.user.id, cookbookId: input.id, version: input.version },
+        "Ignoring stale cookbook rule change"
+      );
+
+      return null;
+    }
+
+    // The member summaries are viewer-scoped, so the echo carries the actor's
+    // own view of the re-ruled cookbook rather than a bare row.
+    const [cookbook] = await withMemberSummaries(listContextFor(ctx), [outcome.value]);
+
+    if (!cookbook) return null;
+
+    log.info({ userId: ctx.user.id, cookbookId: cookbook.id }, "Cookbook rule updated");
     await emitCookbookEvent(ctx, "updated", { cookbook });
 
     return cookbook;
@@ -149,5 +185,6 @@ export const cookbooksProcedures = router({
   get,
   create,
   rename,
+  updateRule,
   remove,
 });

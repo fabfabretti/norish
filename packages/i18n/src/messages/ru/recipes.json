@@ -402,6 +402,18 @@
     "searchRecipes": "Поиск рецептов",
     "noRecipesToAdd": "Рецепты не найдены.",
     "addCount": "{count, plural, one {Добавить # рецепт} few {Добавить # рецепта} many {Добавить # рецептов} other {Добавить # рецепта}}",
-    "everythingAlreadyIn": "Все рецепты уже в этой книге."
+    "everythingAlreadyIn": "Все рецепты уже в этой книге.",
+    "smartMembersNote": "This collection's contents come from its tag rule. Edit the rule from the card to change what is in it."
+  },
+  "collections": {
+    "title": "Collections",
+    "smartBadge": "Auto",
+    "createSmartTitle": "New smart collection",
+    "editSmartTitle": "Edit collection",
+    "tagsLabel": "Tags",
+    "matchesAnd": "Every tag",
+    "matchesOr": "Any tag",
+    "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
+    "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
   }
 }
