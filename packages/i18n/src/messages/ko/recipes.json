@@ -27,6 +27,11 @@
       "all": "전체",
       "recipes": "레시피",
       "cookbooks": "요리책"
+    },
+    "selection": {
+      "select": "선택",
+      "cancel": "취소",
+      "manageTags": "태그 관리"
     }
   },
   "back": {
@@ -415,5 +420,15 @@
     "matchesOr": "Any tag",
     "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
     "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
+  },
+  "bulk": {
+    "selected": "{count, plural, other {#개 선택됨}}",
+    "addTags": "태그 추가",
+    "removeTags": "태그 제거",
+    "done": "완료",
+    "addTitle": "선택 항목에 태그 추가",
+    "removeTitle": "선택 항목에서 태그 제거",
+    "applyAdd": "추가",
+    "applyRemove": "제거"
   }
 }

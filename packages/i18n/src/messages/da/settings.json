@@ -892,6 +892,17 @@
       "empty": "Ingen køkkener endnu.",
       "duplicate": "Der findes allerede et køkken med det navn.",
       "saveFailed": "Kunne ikke gemme det køkken."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "At omdøbe eller sammenlægge en tag påvirker hver opskrift, der bærer den; sletter man den, fjernes den alle steder. En tag, som en husstand har angivet som allergi, kan ikke slettes.",
+      "empty": "Ingen tags endnu.",
+      "usage": "{count, plural, one {# opskrift} other {# opskrifter}}",
+      "renameLabel": "Omdøb {name}",
+      "deleteLabel": "Slet {name}",
+      "deleteConfirm": "Slet taggen \"{name}\" fra alle opskrifter?",
+      "allergy": "Denne tag bruges som allergi og kan ikke slettes.",
+      "saveFailed": "Kunne ikke gemme. Prøv igen."
     }
   },
   "archiveExport": {

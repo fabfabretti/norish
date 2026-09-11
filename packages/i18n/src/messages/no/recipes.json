@@ -27,6 +27,11 @@
       "all": "Alt",
       "recipes": "Oppskrifter",
       "cookbooks": "Kokebøker"
+    },
+    "selection": {
+      "select": "Velg",
+      "cancel": "Avbryt",
+      "manageTags": "Administrer tags"
     }
   },
   "back": {
@@ -415,5 +420,15 @@
     "matchesOr": "Any tag",
     "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
     "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
+  },
+  "bulk": {
+    "selected": "{count, plural, one {# valgt} other {# valgte}}",
+    "addTags": "Legg til tags",
+    "removeTags": "Fjern tags",
+    "done": "Ferdig",
+    "addTitle": "Legg til tags i utvalget",
+    "removeTitle": "Fjern tags fra utvalget",
+    "applyAdd": "Legg til",
+    "applyRemove": "Fjern"
   }
 }

@@ -8,6 +8,7 @@ import { generalProcedures } from "./general";
 import { jobQueueProcedures } from "./job-queue";
 import { permissionsProcedures } from "./permissions";
 import { systemProcedures } from "./system";
+import { tagsProcedures } from "./tags";
 import { usersProcedures } from "./users";
 import { videoRuntimeProcedures } from "./video-runtime";
 
@@ -26,6 +27,9 @@ export const adminRouter = router({
 
   // Cuisine vocabulary governance; the list itself is read from `config.cuisines`
   cuisines: cuisinesProcedures,
+
+  // Tag administration (rename/merge/delete)
+  tags: tagsProcedures,
 
   // Job queue monitoring
   jobs: jobQueueProcedures,

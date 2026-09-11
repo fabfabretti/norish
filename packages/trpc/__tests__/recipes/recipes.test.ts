@@ -4,10 +4,13 @@ import superjson from "superjson";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { recipesRouter } from "../../src/routers/recipes";
+import { getRecipePermissionPolicy } from "../mocks/config";
 import { canAccessResource } from "../mocks/permissions";
 import { recipeEmitter } from "../mocks/recipe-emitter";
 // Import mocks for assertions
 import {
+  bulkAddTagsToRecipes,
+  bulkRemoveTagsFromRecipes,
   createRecipeWithRefs,
   dashboardRecipe,
   deleteRecipeById,
@@ -34,6 +37,8 @@ vi.mock("@norish/db", async (importOriginal) => {
   return {
     ...actual,
     addStepsAndIngredientsToRecipeByInput: vi.fn(),
+    bulkAddTagsToRecipes: recipes.bulkAddTagsToRecipes,
+    bulkRemoveTagsFromRecipes: recipes.bulkRemoveTagsFromRecipes,
     createRecipeWithRefs: recipes.createRecipeWithRefs,
     dashboardRecipe: recipes.dashboardRecipe,
     deleteRecipeById: recipes.deleteRecipeById,
@@ -807,6 +812,104 @@ describe("recipes procedures", () => {
       const payload = updateRecipeWithRefs.mock.calls[0]?.[2] as Record<string, unknown>;
 
       expect("dishColor" in payload).toBe(false);
+    });
+  });
+
+  describe("bulkTags", () => {
+    const recipeId1 = "55555555-5555-4555-8555-555555555555";
+    const recipeId2 = "55555555-5555-4555-8555-555555555556";
+    const mockUser = createMockUser();
+    const mockHousehold = createMockHousehold();
+
+    beforeEach(() => {
+      canAccessResource.mockResolvedValue(true);
+      getRecipeFull.mockResolvedValue(null);
+      getRecipePermissionPolicy.mockResolvedValue({
+        view: "everyone",
+        edit: "household",
+        delete: "household",
+      });
+      bulkAddTagsToRecipes.mockResolvedValue([]);
+      bulkRemoveTagsFromRecipes.mockResolvedValue([]);
+    });
+
+    const createCaller = async () =>
+      recipesRouter.createCaller(
+        await createMockAuthedContext({ user: mockUser, household: mockHousehold })
+      );
+
+    it("adds tags to multiple recipes the user can edit", async () => {
+      getRecipeFull
+        .mockResolvedValueOnce({ id: recipeId1, name: "Recipe 1", tags: [], version: 2 })
+        .mockResolvedValueOnce({ id: recipeId2, name: "Recipe 2", tags: [], version: 2 });
+      bulkAddTagsToRecipes.mockResolvedValue([recipeId1, recipeId2]);
+
+      const caller = await createCaller();
+      const result = await caller.bulkTags({
+        recipeIds: [recipeId1, recipeId2],
+        add: ["vegan", "quick"],
+      });
+
+      expect(result.updated).toBe(2);
+      expect(bulkAddTagsToRecipes).toHaveBeenCalledWith([recipeId1, recipeId2], ["vegan", "quick"]);
+      expect(bulkRemoveTagsFromRecipes).not.toHaveBeenCalled();
+    });
+
+    it("removes tags from multiple recipes the user can edit", async () => {
+      getRecipeFull
+        .mockResolvedValueOnce({ id: recipeId1, name: "Recipe 1", tags: [], version: 2 })
+        .mockResolvedValueOnce({ id: recipeId2, name: "Recipe 2", tags: [], version: 2 });
+      bulkRemoveTagsFromRecipes.mockResolvedValue([recipeId1, recipeId2]);
+
+      const caller = await createCaller();
+      const result = await caller.bulkTags({
+        recipeIds: [recipeId1, recipeId2],
+        remove: ["spicy"],
+      });
+
+      expect(result.updated).toBe(2);
+      expect(bulkRemoveTagsFromRecipes).toHaveBeenCalledWith([recipeId1, recipeId2], ["spicy"]);
+    });
+
+    it("skips recipes without edit access and only updates accessible ones", async () => {
+      getRecipeOwnerId.mockResolvedValue(mockUser.id);
+      canAccessResource.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      bulkAddTagsToRecipes.mockResolvedValue([recipeId1]);
+      getRecipeFull.mockResolvedValue({ id: recipeId1, name: "Recipe 1", tags: [], version: 2 });
+
+      const caller = await createCaller();
+      const result = await caller.bulkTags({
+        recipeIds: [recipeId1, recipeId2],
+        add: ["vegan"],
+      });
+
+      expect(result.updated).toBe(1);
+      expect(bulkAddTagsToRecipes).toHaveBeenCalledWith([recipeId1], ["vegan"]);
+    });
+
+    it("returns 0 when no recipes are accessible", async () => {
+      getRecipeOwnerId.mockResolvedValue(mockUser.id);
+      canAccessResource.mockResolvedValue(false);
+
+      const caller = await createCaller();
+      const result = await caller.bulkTags({
+        recipeIds: [recipeId1, recipeId2],
+        add: ["vegan"],
+      });
+
+      expect(result.updated).toBe(0);
+      expect(bulkAddTagsToRecipes).not.toHaveBeenCalled();
+      expect(bulkRemoveTagsFromRecipes).not.toHaveBeenCalled();
+    });
+
+    it("throws BAD_REQUEST when neither add nor remove provided", async () => {
+      const caller = await createCaller();
+
+      await expect(
+        caller.bulkTags({
+          recipeIds: [recipeId1],
+        })
+      ).rejects.toThrow("Provide tags to add or remove");
     });
   });
 });

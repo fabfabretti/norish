@@ -11,6 +11,7 @@ import JobQueueCard from "./job-queue-card";
 import PermissionPolicyCard from "./permission-policy-card";
 import AdminShareLinksCard from "./share-links-card";
 import SystemCard from "./system-card";
+import TagsCard from "./tags-card";
 import UsersCard from "./users-card";
 
 function AdminSettingsContent() {
@@ -29,6 +30,7 @@ function AdminSettingsContent() {
       <AuthProvidersCard />
       <ContentDetectionCard />
       <AIProcessingCard />
+      <TagsCard />
       <JobQueueCard />
       <SystemCard />
     </div>

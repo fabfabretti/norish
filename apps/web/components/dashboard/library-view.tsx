@@ -4,6 +4,7 @@ import type { LibraryGridItem } from "@/lib/library-items";
 import type { RecipeDashboardViewMode } from "@/lib/recipe-view-mode";
 import { useCallback, useMemo } from "react";
 import CookbookCard from "@/components/cookbooks/cookbook-card";
+import BulkSelectionBar from "@/components/dashboard/bulk-selection-bar";
 import LibraryGrid from "@/components/dashboard/library-grid";
 import NoCookbooksText from "@/components/dashboard/no-cookbooks-text";
 import NoRecipeResults from "@/components/dashboard/no-recipe-results";
@@ -37,6 +38,11 @@ export default function LibraryView({ variant }: { variant: RecipeDashboardViewM
     toggleFavorite,
     deleteRecipe,
     allergies,
+    selectionMode,
+    selectedIds,
+    toggleSelect,
+    enterSelectionMode,
+    exitSelectionMode,
   } = useRecipesContext();
   const { deleteCookbook } = useCookbooksMutations();
 
@@ -84,15 +90,38 @@ export default function LibraryView({ variant }: { variant: RecipeDashboardViewM
         <RecipeCard
           allergies={allergies}
           isFavorite={isFavorite(item.recipe.id)}
+          isSelected={selectedIds.has(item.recipe.id)}
           recipe={item.recipe}
+          selectionMode={selectionMode}
           variant={variant}
           onDelete={deleteRecipe}
+          onEnterSelectionMode={enterSelectionMode}
+          onSelect={toggleSelect}
           onToggleFavorite={toggleFavorite}
         />
       );
     },
-    [variant, allergies, isFavorite, deleteRecipe, toggleFavorite, deleteCookbook]
+    [
+      variant,
+      allergies,
+      isFavorite,
+      deleteRecipe,
+      toggleFavorite,
+      deleteCookbook,
+      selectionMode,
+      selectedIds,
+      toggleSelect,
+      enterSelectionMode,
+    ]
   );
+
+  const bulkBar = selectionMode ? (
+    <BulkSelectionBar
+      selectedCount={selectedIds.size}
+      onExit={exitSelectionMode}
+      selectedIds={Array.from(selectedIds)}
+    />
+  ) : null;
 
   const emptyState =
     filters.libraryType === "cookbooks" && !hasAppliedFilters ? (
@@ -104,15 +133,18 @@ export default function LibraryView({ variant }: { variant: RecipeDashboardViewM
     );
 
   return (
-    <LibraryGrid
-      emptyState={emptyState}
-      isFetchingMore={isValidating && !isLoading}
-      isLoading={isLoading || !isHydrated}
-      items={gridItems}
-      loadMore={loadMore}
-      renderItem={renderItem}
-      scrollKey={filterKey}
-      variant={variant}
-    />
+    <>
+      {bulkBar}
+      <LibraryGrid
+        emptyState={emptyState}
+        isFetchingMore={isValidating && !isLoading}
+        isLoading={isLoading || !isHydrated}
+        items={gridItems}
+        loadMore={loadMore}
+        renderItem={renderItem}
+        scrollKey={filterKey}
+        variant={variant}
+      />
+    </>
   );
 }

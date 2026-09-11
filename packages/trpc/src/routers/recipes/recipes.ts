@@ -7,6 +7,8 @@ import type { RecipeEnrichmentSkipReason } from "@norish/shared/lib/recipe-enric
 import { canAccessResource, isAIEnabled as checkAIEnabled } from "@norish/auth/permissions";
 import {
   addStepsAndIngredientsToRecipeByInput,
+  bulkAddTagsToRecipes,
+  bulkRemoveTagsFromRecipes,
   createRecipeWithRefs,
   dashboardRecipe,
   deleteRecipeById,
@@ -323,6 +325,71 @@ const updateCategories = authedProcedure
     }
 
     return { success: true };
+  });
+
+/**
+ * Bulk tag editing for the Library's selection: add and/or remove tags on many
+ * recipes in one pass. Recipes the caller may not edit are skipped rather than
+ * failing the whole operation.
+ */
+const bulkTags = authedProcedure
+  .input(
+    z.object({
+      recipeIds: z.array(z.uuid()).min(1).max(100),
+      add: z.array(z.string().trim().min(1).max(50)).max(25).optional(),
+      remove: z.array(z.string().trim().min(1).max(50)).max(25).optional(),
+    })
+  )
+  .mutation(async ({ ctx, input }) => {
+    const add = Array.from(new Set(input.add ?? []));
+    const remove = Array.from(new Set(input.remove ?? []));
+
+    if (add.length === 0 && remove.length === 0) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Provide tags to add or remove" });
+    }
+
+    const allowedIds: string[] = [];
+
+    for (const recipeId of input.recipeIds) {
+      try {
+        await assertRecipeAccess(ctx, recipeId, "edit");
+        allowedIds.push(recipeId);
+      } catch {
+        log.debug(
+          { userId: ctx.user.id, recipeId },
+          "Skipping recipe in bulk tag update without edit access"
+        );
+      }
+    }
+
+    if (allowedIds.length === 0) return { updated: 0 };
+
+    const addedAffected = add.length > 0 ? await bulkAddTagsToRecipes(allowedIds, add) : [];
+    const removedAffected = remove.length > 0 ? await bulkRemoveTagsFromRecipes(allowedIds, remove) : [];
+    const affected = Array.from(new Set([...addedAffected, ...removedAffected]));
+
+    const policy = await getRecipePermissionPolicy();
+
+    for (const recipeId of affected) {
+      const updatedRecipe = await getRecipeFull(recipeId);
+
+      if (updatedRecipe) {
+        emitByPolicy(
+          recipeEmitter,
+          policy.view,
+          { userId: ctx.user.id, householdKey: ctx.householdKey },
+          "updated",
+          { recipe: updatedRecipe }
+        );
+      }
+    }
+
+    log.info(
+      { userId: ctx.user.id, affected: affected.length, add, remove },
+      "Applied bulk tag update"
+    );
+
+    return { updated: affected.length };
   });
 
 const deleteProcedure = authedProcedure
@@ -814,5 +881,6 @@ export const recipesProcedures = router({
   enrichmentStatus,
   autocomplete,
   updateCategories,
+  bulkTags,
   getRandomRecipe,
 });

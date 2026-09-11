@@ -892,6 +892,17 @@
       "empty": "Brak kuchni.",
       "duplicate": "Kuchnia o tej nazwie już istnieje.",
       "saveFailed": "Nie udało się zapisać tej kuchni."
+    },
+    "tags": {
+      "title": "Tagi",
+      "description": "Zmiana nazwy lub scalenie taga wpływa na każdy przepis, który go nosi; usunięcie usuwa go wszędzie. Taga, który gospodarstwo podało jako alergen, nie można usunąć.",
+      "empty": "Brak tagów.",
+      "usage": "{count, plural, one {# przepis} few {# przepisy} many {# przepisów} other {# przepisów}}",
+      "renameLabel": "Zmień nazwę {name}",
+      "deleteLabel": "Usuń {name}",
+      "deleteConfirm": "Usunąć tag \"{name}\" ze wszystkich przepisów?",
+      "allergy": "Ten tag jest używany jako alergen i nie można go usunąć.",
+      "saveFailed": "Nie udało się zapisać. Spróbuj ponownie."
     }
   },
   "archiveExport": {

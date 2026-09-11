@@ -13,13 +13,18 @@ import {
   RecipeViewModeProvider,
   useRecipeDashboardViewMode,
 } from "@/context/recipe-view-mode-context";
+import { useRecipesContext } from "@/context/recipes-context";
 import { recipeViewModePreference } from "@/lib/recipe-view-mode";
-import { Tabs } from "@heroui/react";
+import { CheckIcon, TagIcon, XMarkIcon } from "@heroicons/react/20/solid";
+import { Button } from "@heroui/react";
+import { useTranslations } from "next-intl";
 
 const LIBRARY_HEADING_ID = "recipe-library-heading";
 
-function RecipeLibrary() {
+function RecipeLibrary({ isServerAdmin }: { isServerAdmin?: boolean }) {
   const [viewMode, setViewMode] = useRecipeDashboardViewMode();
+  const t = useTranslations("recipes.dashboard");
+  const { selectionMode, enterSelectionMode, exitSelectionMode } = useRecipesContext();
 
   return (
     <section aria-labelledby={LIBRARY_HEADING_ID} className="flex min-h-0 flex-1 flex-col">
@@ -32,6 +37,37 @@ function RecipeLibrary() {
           <div className="flex min-h-10 flex-wrap items-center justify-between gap-3">
             <LibraryHeading id={LIBRARY_HEADING_ID} />
             <div className="flex items-center gap-2">
+              {selectionMode ? (
+                <Button
+                  size="sm"
+                  startContent={<XMarkIcon className="h-4 w-4" />}
+                  variant="ghost"
+                  onPress={exitSelectionMode}
+                >
+                  {t("selection.cancel")}
+                </Button>
+              ) : (
+                <>
+                  {isServerAdmin && (
+                    <Button
+                      size="sm"
+                      startContent={<TagIcon className="h-4 w-4" />}
+                      variant="flat"
+                      href="/settings?tab=admin"
+                    >
+                      {t("selection.manageTags")}
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    startContent={<CheckIcon className="h-4 w-4" />}
+                    variant="flat"
+                    onPress={() => enterSelectionMode()}
+                  >
+                    {t("selection.select")}
+                  </Button>
+                </>
+              )}
               <RecipeViewModeToggle />
               <CreateRecipeButton />
             </div>
@@ -59,13 +95,21 @@ function RecipeLibrary() {
  *
  * `initialViewMode` comes from the cookie the Live route read on the server;
  * the Offline bootstrap has no server pass and lets the provider read it.
+ * `isServerAdmin` gates the tag manager entry point the same way the settings
+ * route gates its admin tab, so both stay server-authorised.
  */
-export function Dashboard({ initialViewMode }: { initialViewMode?: RecipeDashboardViewMode }) {
+export function Dashboard({
+  initialViewMode,
+  isServerAdmin,
+}: {
+  initialViewMode?: RecipeDashboardViewMode;
+  isServerAdmin?: boolean;
+}) {
   return (
     <RecipeViewModeProvider initialValue={initialViewMode}>
       <div className="flex min-h-0 w-full flex-1 flex-col gap-8">
         <TodaysMeals />
-        <RecipeLibrary />
+        <RecipeLibrary isServerAdmin={isServerAdmin} />
         <FloatingRecipeChip />
       </div>
     </RecipeViewModeProvider>

@@ -27,6 +27,11 @@
       "all": "Все",
       "recipes": "Рецепты",
       "cookbooks": "Кулинарные книги"
+    },
+    "selection": {
+      "select": "Выбрать",
+      "cancel": "Отмена",
+      "manageTags": "Управление тегами"
     }
   },
   "back": {
@@ -415,5 +420,15 @@
     "matchesOr": "Any tag",
     "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
     "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
+  },
+  "bulk": {
+    "selected": "{count, plural, one {# выбран} many {# выбрано} other {# выбрано}}",
+    "addTags": "Добавить теги",
+    "removeTags": "Удалить теги",
+    "done": "Готово",
+    "addTitle": "Добавить теги к выделению",
+    "removeTitle": "Удалить теги из выделения",
+    "applyAdd": "Добавить",
+    "applyRemove": "Удалить"
   }
 }

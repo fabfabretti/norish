@@ -892,6 +892,17 @@
       "empty": "Nog geen keukens.",
       "duplicate": "Er bestaat al een keuken met die naam.",
       "saveFailed": "Kon die keuken niet opslaan."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Een tag hernoemen of samenvoegen heeft invloed op elk recept dat hem draagt; verwijderen verwijdert hem overal. Een tag die een huishouden als allergie opgeeft, kan niet worden verwijderd.",
+      "empty": "Nog geen tags.",
+      "usage": "{count, plural, one {# recept} other {# recepten}}",
+      "renameLabel": "{name} hernoemen",
+      "deleteLabel": "{name} verwijderen",
+      "deleteConfirm": "De tag \"{name}\" uit elk recept verwijderen?",
+      "allergy": "Deze tag wordt als allergie gebruikt en kan niet worden verwijderd.",
+      "saveFailed": "Opslaan mislukt. Probeer het opnieuw."
     }
   },
   "archiveExport": {

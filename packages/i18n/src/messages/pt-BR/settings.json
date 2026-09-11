@@ -892,6 +892,17 @@
       "empty": "Nenhuma culinária ainda.",
       "duplicate": "Já existe uma culinária com esse nome.",
       "saveFailed": "Não foi possível salvar essa culinária."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Renomear ou mesclar uma tag afeta cada receita que a utiliza; excluí-la a remove de todos os lugares. Uma tag que alguma família liste como alergia não pode ser excluída.",
+      "empty": "Nenhuma tag ainda.",
+      "usage": "{count, plural, one {# receita} other {# receitas}}",
+      "renameLabel": "Renomear {name}",
+      "deleteLabel": "Excluir {name}",
+      "deleteConfirm": "Excluir a tag \"{name}\" de todas as receitas?",
+      "allergy": "Esta tag é usada como alergia e não pode ser excluída.",
+      "saveFailed": "Falha ao salvar. Tente novamente."
     }
   },
   "archiveExport": {

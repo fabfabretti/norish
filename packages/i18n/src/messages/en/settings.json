@@ -892,6 +892,17 @@
       "empty": "No Cuisines yet.",
       "duplicate": "A Cuisine with that name already exists.",
       "saveFailed": "Could not save that Cuisine."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Renaming or merging a tag affects every recipe that carries it; deleting one removes it everywhere. A tag any household lists as an allergy cannot be deleted.",
+      "empty": "No tags yet.",
+      "usage": "{count, plural, one {# recipe} other {# recipes}}",
+      "renameLabel": "Rename {name}",
+      "deleteLabel": "Delete {name}",
+      "deleteConfirm": "Delete the tag \"{name}\" from every recipe?",
+      "allergy": "This tag is used as a household allergy and cannot be deleted.",
+      "saveFailed": "Save failed. Please try again."
     }
   },
   "archiveExport": {
