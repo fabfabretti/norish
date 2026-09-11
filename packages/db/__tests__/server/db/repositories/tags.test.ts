@@ -14,6 +14,7 @@ import {
   getRecipeTagNames,
   listAllTagNames,
   listTagsWithUsage,
+  updateTagName,
 } from "@norish/db/repositories/tags";
 import { recipes, userAllergies } from "@norish/db/schema";
 
@@ -187,5 +188,45 @@ describe("Tags Repository", () => {
       .where(eq(recipes.id, r2.id));
     expect(v1[0].version).toBe(4); // create, add vegan, add nuts, delete vegan
     expect(v2[0].version).toBe(3); // create, add vegan, delete vegan
+  });
+
+  it("renames a tag into an existing one and merges recipes that carry both", async () => {
+    const u1 = await createTestUser();
+    const u2 = await createTestUser();
+    const r1 = await createTestRecipe(u1.id, { name: "R1" });
+    const r2 = await createTestRecipe(u2.id, { name: "R2" });
+
+    await bulkAddTagsToRecipes([r1.id, r2.id], ["vegan"]);
+    await bulkAddTagsToRecipes([r1.id], ["vegano"]);
+
+    const veganTag = await findTagByName("vegan");
+    const veganoTag = await findTagByName("vegano");
+
+    expect(veganTag).not.toBeNull();
+    expect(veganoTag).not.toBeNull();
+
+    await db.insert(userAllergies).values({ userId: r1.userId, tagId: veganTag!.id });
+    await db.insert(userAllergies).values({ userId: r2.userId, tagId: veganoTag!.id });
+
+    const result = await updateTagName("vegan", "vegano");
+
+    expect(result.merged).toBe(true);
+    expect(await findTagByName("vegan")).toBeNull();
+
+    // r1 carried both tags: it keeps a single row pointing at the survivor
+    // (with the generic name), r2 only carried "vegan" and gets redirected.
+    expect(await getRecipeTagNames(r1.id)).toEqual(["vegano"]);
+    expect(await getRecipeTagNames(r2.id)).toEqual(["vegano"]);
+
+    // Allergies follow the merged tag: r1's "vegan" allergy re-points to
+    // vegano, r2's pre-existing vegano allergy is left untouched. Nothing is
+    // dropped by the old-tag deletion.
+    const allergies = await db
+      .select({ userId: userAllergies.userId })
+      .from(userAllergies)
+      .where(eq(userAllergies.tagId, veganoTag!.id))
+      .orderBy(userAllergies.userId);
+
+    expect(allergies).toEqual([{ userId: r1.userId }, { userId: r2.userId }]);
   });
 });

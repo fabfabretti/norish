@@ -472,11 +472,44 @@ export async function updateTagName(
       .then((rows) => rows[0]);
 
     if (existingTag) {
-      // Merge: update all recipe_tags to point to existing tag, delete old tag
-      await tx
-        .update(recipeTags)
-        .set({ tagId: existingTag.id, version: sql`${recipeTags.version} + 1` })
+      // Merge: point every recipe_tag at the surviving tag. A recipe that
+      // already carries both tags would violate the (recipe, tag) primary key
+      // on a blind UPDATE, so skip those — they are already merged. Allergies
+      // follow to the surviving tag instead of being cascade-deleted by the
+      // old-tag drop; deleting those rows would lose safety data.
+      const rows = await tx
+        .select({ recipeId: recipeTags.recipeId })
+        .from(recipeTags)
         .where(eq(recipeTags.tagId, oldTag.id));
+
+      for (const row of rows) {
+        const already = await tx
+          .select({ tagId: recipeTags.tagId })
+          .from(recipeTags)
+          .where(and(eq(recipeTags.recipeId, row.recipeId), eq(recipeTags.tagId, existingTag.id)))
+          .limit(1);
+
+        if (already.length > 0) continue;
+
+        await tx
+          .update(recipeTags)
+          .set({ tagId: existingTag.id, version: sql`${recipeTags.version} + 1` })
+          .where(and(eq(recipeTags.recipeId, row.recipeId), eq(recipeTags.tagId, oldTag.id)));
+      }
+
+      const allergyUsers = await tx
+        .select({ userId: userAllergies.userId })
+        .from(userAllergies)
+        .where(eq(userAllergies.tagId, oldTag.id));
+
+      await tx.delete(userAllergies).where(eq(userAllergies.tagId, oldTag.id));
+
+      if (allergyUsers.length > 0) {
+        await tx
+          .insert(userAllergies)
+          .values(allergyUsers.map((u) => ({ userId: u.userId, tagId: existingTag.id })))
+          .onConflictDoNothing();
+      }
 
       await tx.delete(tags).where(eq(tags.id, oldTag.id));
 

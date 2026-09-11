@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/app/providers/trpc-provider";
 import { CheckIcon, PencilIcon, TrashIcon, XMarkIcon } from "@heroicons/react/16/solid";
@@ -29,14 +29,14 @@ export default function TagsCard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
-  const [error, setError] = useState<"duplicate" | "allergy" | "saveFailed" | null>(null);
+  const [error, setError] = useState<"allergy" | "saveFailed" | null>(null);
 
-  const run = useCallback(async (action: () => Promise<unknown>, onDone: () => void) => {
+  const handleDelete = async (target: { id: string; name: string }) => {
     setError(null);
 
     try {
-      await action();
-      onDone();
+      await remove(target.id);
+      setPendingDelete(null);
     } catch (err) {
       const code =
         typeof err === "object" && err !== null && "data" in err
@@ -45,17 +45,23 @@ export default function TagsCard() {
 
       setError(code === "CONFLICT" ? "allergy" : "saveFailed");
     }
-  }, []);
+  };
 
   const handleRename = () => {
     const name = editingName.trim();
 
     if (!editingId || !name) return;
 
-    void run(
-      () => rename(editingId, name),
-      () => setEditingId(null)
-    );
+    setError(null);
+
+    void (async () => {
+      try {
+        await rename(editingId, name);
+        setEditingId(null);
+      } catch {
+        setError("saveFailed");
+      }
+    })();
   };
 
   return (
@@ -161,10 +167,7 @@ export default function TagsCard() {
 
                         if (!target) return;
 
-                        void run(
-                          () => remove(target.id),
-                          () => setPendingDelete(null)
-                        );
+                        void handleDelete(target);
                       }}
                       variant="danger"
                     >
