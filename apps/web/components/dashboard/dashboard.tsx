@@ -16,7 +16,7 @@ import {
 import { useRecipesContext } from "@/context/recipes-context";
 import { recipeViewModePreference } from "@/lib/recipe-view-mode";
 import { CheckIcon, TagIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { Button } from "@heroui/react";
+import { Button, Tabs } from "@heroui/react";
 import { useTranslations } from "next-intl";
 
 const LIBRARY_HEADING_ID = "recipe-library-heading";
