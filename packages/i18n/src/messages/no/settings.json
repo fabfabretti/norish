@@ -892,6 +892,17 @@
       "empty": "Ingen kjøkken ennå.",
       "duplicate": "Et kjøkken med det navnet finnes allerede.",
       "saveFailed": "Kunne ikke lagre det kjøkkenet."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Å gi nytt navn til eller slå sammen en tag påvirker hver oppskrift som bærer den; sletting fjerner den overalt. En tag som en husstand har oppgitt som allergi, kan ikke slettes.",
+      "empty": "Ingen tags ennå.",
+      "usage": "{count, plural, one {# oppskrift} other {# oppskrifter}}",
+      "renameLabel": "Gi nytt navn til {name}",
+      "deleteLabel": "Slett {name}",
+      "deleteConfirm": "Slette taggen \"{name}\" fra alle oppskrifter?",
+      "allergy": "Denne taggen brukes som allergi og kan ikke slettes.",
+      "saveFailed": "Lagring mislyktes. Prøv igjen."
     }
   },
   "archiveExport": {

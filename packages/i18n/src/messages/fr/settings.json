@@ -892,6 +892,17 @@
       "empty": "Aucune cuisine pour le moment.",
       "duplicate": "Une cuisine porte déjà ce nom.",
       "saveFailed": "Impossible d'enregistrer cette cuisine."
+    },
+    "tags": {
+      "title": "Étiquettes",
+      "description": "Renommer ou fusionner une étiquette affecte chaque recette qui la porte ; la supprimer la retire partout. Une étiquette que le foyer déclare comme allergie ne peut pas être supprimée.",
+      "empty": "Aucune étiquette pour l'instant.",
+      "usage": "{count, plural, one {# recette} other {# recettes}}",
+      "renameLabel": "Renommer {name}",
+      "deleteLabel": "Supprimer {name}",
+      "deleteConfirm": "Supprimer l'étiquette « {name} » de chaque recette ?",
+      "allergy": "Cette étiquette est utilisée comme allergie et ne peut pas être supprimée.",
+      "saveFailed": "Échec de l'enregistrement. Veuillez réessayer."
     }
   },
   "archiveExport": {

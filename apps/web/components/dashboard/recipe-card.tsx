@@ -15,6 +15,7 @@ import { withOrigin } from "@/lib/back-destination";
 import { useAppStore } from "@/stores/useAppStore";
 import {
   CalendarDaysIcon,
+  CheckIcon,
   ClockIcon,
   EllipsisHorizontalIcon,
   ShoppingBagIcon,
@@ -47,6 +48,10 @@ type RecipeCardProps = {
   variant?: "grid" | "list";
   onToggleFavorite: (recipeId: string) => void;
   onDelete: (recipeId: string, version: number) => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: (recipeId: string) => void;
+  onEnterSelectionMode?: (recipeId: string) => void;
 };
 
 type RecipeTagValue = RecipeDashboardDTO["tags"][number] | string | null | undefined;
@@ -112,6 +117,10 @@ function RecipeCardComponent({
   variant = "grid",
   onToggleFavorite,
   onDelete,
+  selectionMode = false,
+  isSelected = false,
+  onSelect,
+  onEnterSelectionMode,
 }: RecipeCardProps) {
   const router = useRouter();
   // This card stands on the Library and inside a cookbook, so where the reader
@@ -140,12 +149,72 @@ function RecipeCardComponent({
   const averageRating = recipe.averageRating ?? null;
 
   const handleNavigate = useCallback(() => {
+    if (selectionMode) return;
+
     if (recipe.id && !open && !mobileSearchOpen) {
       // Navigate immediately - skeleton shows while data loads
       // Prefetch is already happening via useRecipePrefetch hook
       router.push(withOrigin(`/recipes/${recipe.id}`, pathname));
     }
-  }, [router, recipe.id, open, mobileSearchOpen, pathname]);
+  }, [router, recipe.id, open, mobileSearchOpen, pathname, selectionMode]);
+
+  // Long-press enters selection mode with this card already picked, so touch
+  // users can start a batch without finding the toolbar first.
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
+
+  const startLongPress = useCallback(
+    (e: React.PointerEvent) => {
+      if (selectionMode || e.pointerType === "mouse" || !onEnterSelectionMode) return;
+
+      longPressOrigin.current = { x: e.clientX, y: e.clientY };
+      longPressTimer.current = setTimeout(() => {
+        onEnterSelectionMode(recipe.id);
+      }, 450);
+    },
+    [selectionMode, onEnterSelectionMode, recipe.id]
+  );
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+
+    longPressTimer.current = null;
+    longPressOrigin.current = null;
+  }, []);
+
+  const moveLongPress = useCallback(
+    (e: React.PointerEvent) => {
+      if (!longPressTimer.current) return;
+
+      const origin = longPressOrigin.current;
+
+      if (origin && (Math.abs(e.clientX - origin.x) > 10 || Math.abs(e.clientY - origin.y) > 10)) {
+        cancelLongPress();
+      }
+    },
+    [cancelLongPress]
+  );
+
+  const handleCardClick = useCallback(() => {
+    if (selectionMode) {
+      onSelect?.(recipe.id);
+
+      return;
+    }
+
+    if (open) rowRef.current?.closeRow();
+  }, [selectionMode, onSelect, recipe.id, open]);
+
+  const selectionBadge = selectionMode ? (
+    <div
+      aria-label={`selected: ${isSelected}`}
+      className={`absolute top-3 right-3 z-30 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+        isSelected ? "bg-accent border-accent" : "border-muted bg-surface/80"
+      } shadow-sm`}
+    >
+      {isSelected && <CheckIcon className="text-accent-foreground h-3.5 w-3.5" />}
+    </div>
+  ) : null;
 
   const totalMinutes =
     recipe.totalMinutes ?? ((recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0) || undefined);
@@ -368,18 +437,20 @@ function RecipeCardComponent({
         className={`relative h-[128px] w-full overflow-hidden transition-all duration-300 ${open ? "rounded-none opacity-70" : "rounded-2xl"} `}
         role="button"
         tabIndex={open ? 0 : -1}
-        onClick={() => {
-          if (open) rowRef.current?.closeRow();
-          else handleNavigate();
-        }}
+        onClick={handleCardClick}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            if (open) rowRef.current?.closeRow();
-            else handleNavigate();
+            handleCardClick();
           }
         }}
+        onPointerDown={startLongPress}
+        onPointerMove={moveLongPress}
+        onPointerUp={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        onPointerLeave={cancelLongPress}
       >
+        {selectionBadge}
         <div className="group/row relative h-full w-full">
           <Card className="border-border bg-surface relative h-full w-full overflow-hidden rounded-2xl border p-0">
             <div className="flex h-full min-w-0 items-stretch">
@@ -440,16 +511,20 @@ function RecipeCardComponent({
         className={`relative h-[340px] w-full overflow-hidden transition-all duration-300 ${open ? "rounded-none opacity-70" : "rounded-3xl"} `}
         role="button"
         tabIndex={open ? 0 : -1}
-        onClick={() => {
-          if (open) rowRef.current?.closeRow();
-        }}
+        onClick={handleCardClick}
         onKeyDown={(e) => {
           if ((e.key === "Enter" || e.key === " ") && open) {
             e.preventDefault();
             rowRef.current?.closeRow();
           }
         }}
+        onPointerDown={startLongPress}
+        onPointerMove={moveLongPress}
+        onPointerUp={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        onPointerLeave={cancelLongPress}
       >
+        {selectionBadge}
         <div className="group/row relative h-full w-full">
           <Card
             className="border-border bg-surface shadow-surface relative h-full w-full gap-0 overflow-hidden rounded-3xl border p-0 focus-visible:outline-none"
@@ -559,9 +634,13 @@ const RecipeCard = memo(RecipeCardComponent, (prevProps, nextProps) => {
   if (prevProps.isFavorite !== nextProps.isFavorite) return false;
   if (prevProps.allergies !== nextProps.allergies) return false;
   if (prevProps.variant !== nextProps.variant) return false;
+  if (prevProps.selectionMode !== nextProps.selectionMode) return false;
+  if (prevProps.isSelected !== nextProps.isSelected) return false;
   // Functions are stable via useCallback in parent, but check identity anyway
   if (prevProps.onToggleFavorite !== nextProps.onToggleFavorite) return false;
   if (prevProps.onDelete !== nextProps.onDelete) return false;
+  if (prevProps.onSelect !== nextProps.onSelect) return false;
+  if (prevProps.onEnterSelectionMode !== nextProps.onEnterSelectionMode) return false;
 
   const prev = prevProps.recipe;
   const next = nextProps.recipe;

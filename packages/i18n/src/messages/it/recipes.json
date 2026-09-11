@@ -27,6 +27,11 @@
       "all": "Tutto",
       "recipes": "Ricette",
       "cookbooks": "Libri di cucina"
+    },
+    "selection": {
+      "select": "Seleziona",
+      "cancel": "Annulla",
+      "manageTags": "Gestisci tag"
     }
   },
   "back": {
@@ -415,5 +420,15 @@
     "matchesOr": "Any tag",
     "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
     "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
+  },
+  "bulk": {
+    "selected": "{count, plural, one {# selezionato} other {# selezionati}}",
+    "addTags": "Aggiungi tag",
+    "removeTags": "Rimuovi tag",
+    "done": "Fatto",
+    "addTitle": "Aggiungi tag alla selezione",
+    "removeTitle": "Rimuovi tag dalla selezione",
+    "applyAdd": "Aggiungi",
+    "applyRemove": "Rimuovi"
   }
 }

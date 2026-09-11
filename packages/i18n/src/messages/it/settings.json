@@ -892,6 +892,17 @@
       "empty": "Ancora nessuna cucina.",
       "duplicate": "Esiste già una cucina con quel nome.",
       "saveFailed": "Impossibile salvare quella cucina."
+    },
+    "tags": {
+      "title": "Tag",
+      "description": "Rinominare o unire un tag riguarda ogni ricetta che lo porta; eliminarlo lo rimuove ovunque. Un tag che una famiglia indica come allergia non può essere eliminato.",
+      "empty": "Nessun tag per ora.",
+      "usage": "{count, plural, one {# ricetta} other {# ricette}}",
+      "renameLabel": "Rinomina {name}",
+      "deleteLabel": "Elimina {name}",
+      "deleteConfirm": "Eliminare il tag \"{name}\" da ogni ricetta?",
+      "allergy": "Questo tag è usato come allergia e non può essere eliminato.",
+      "saveFailed": "Salvataggio non riuscito. Riprova."
     }
   },
   "archiveExport": {

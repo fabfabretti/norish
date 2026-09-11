@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRecipesFiltersContext } from "@/context/recipes-filters-context";
 import { useFavoritesMutation, useFavoritesQuery } from "@/hooks/favorites";
@@ -41,6 +41,11 @@ type Ctx = {
   deleteRecipe: (id: string, version: number) => void;
   invalidate: () => void;
   openRecipe: (id: string) => void;
+  selectionMode: boolean;
+  selectedIds: Set<string>;
+  enterSelectionMode: (recipeId?: string) => void;
+  toggleSelect: (recipeId: string) => void;
+  exitSelectionMode: () => void;
 };
 
 const sharedRecipesContext = createRecipesContext({
@@ -104,6 +109,8 @@ export function RecipesContextProvider({ children }: { children: React.ReactNode
 function RecipesContextAdapter({ children }: { children: React.ReactNode }) {
   const base = sharedRecipesContext.useRecipesContext();
   const { allergies } = useActiveAllergies();
+  const { selectionMode, selectedIds, enterSelectionMode, toggleSelect, exitSelectionMode } =
+    useRecipeSelection();
 
   // Favourites are narrowed by the Library query itself now, so there is no
   // client-side slice left here — one that recomputed `total` from the current
@@ -112,11 +119,65 @@ function RecipesContextAdapter({ children }: { children: React.ReactNode }) {
     () => ({
       ...base,
       allergies,
+      selectionMode,
+      selectedIds,
+      enterSelectionMode,
+      toggleSelect,
+      exitSelectionMode,
     }),
-    [base, allergies]
+    [
+      base,
+      allergies,
+      selectionMode,
+      selectedIds,
+      enterSelectionMode,
+      toggleSelect,
+      exitSelectionMode,
+    ]
   );
 
   return <RecipesContext.Provider value={value}>{children}</RecipesContext.Provider>;
+}
+
+/**
+ * Library multi-select: which recipes are picked and whether cards toggle
+ * instead of navigating. Kept beside the shared recipes context, which owns
+ * the list itself; the Library tab is the only consumer.
+ */
+function useRecipeSelection() {
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const enterSelectionMode = useCallback((recipeId?: string) => {
+    setSelectionMode(true);
+    setSelectedIds((current) => {
+      if (!recipeId) return current;
+
+      const next = new Set(current);
+
+      next.add(recipeId);
+
+      return next;
+    });
+  }, []);
+
+  const toggleSelect = useCallback((recipeId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(recipeId)) next.delete(recipeId);
+      else next.add(recipeId);
+
+      return next;
+    });
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  return { selectionMode, selectedIds, enterSelectionMode, toggleSelect, exitSelectionMode };
 }
 
 export function useRecipesContext() {
