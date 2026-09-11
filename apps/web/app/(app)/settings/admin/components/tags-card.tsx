@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/app/providers/trpc-provider";
 import { CheckIcon, PencilIcon, TrashIcon, XMarkIcon } from "@heroicons/react/16/solid";
 import { TagIcon } from "@heroicons/react/24/outline";
@@ -22,7 +23,7 @@ export default function TagsCard() {
   const t = useTranslations("settings.admin.tags");
   const tActions = useTranslations("common.actions");
   const trpc = useTRPC();
-  const { data: tags = [], isLoading } = trpc.admin.tags.list.useQuery();
+  const { data: tags = [], isLoading } = useQuery(trpc.admin.tags.list.queryOptions());
   const { rename, remove, isPending } = useTagAdminMutations();
 
   const [editingId, setEditingId] = useState<string | null>(null);
