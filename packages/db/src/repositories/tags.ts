@@ -497,6 +497,10 @@ export async function updateTagName(
           .where(and(eq(recipeTags.recipeId, row.recipeId), eq(recipeTags.tagId, oldTag.id)));
       }
 
+      // Rows that were skipped (the recipe already held both tags) still point
+      // at the old tag and would block its deletion via the FK, so drop them.
+      await tx.delete(recipeTags).where(eq(recipeTags.tagId, oldTag.id));
+
       const allergyUsers = await tx
         .select({ userId: userAllergies.userId })
         .from(userAllergies)
