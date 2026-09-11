@@ -17,6 +17,7 @@ import { useRecipesContext } from "@/context/recipes-context";
 import { recipeViewModePreference } from "@/lib/recipe-view-mode";
 import { CheckIcon, TagIcon, XMarkIcon } from "@heroicons/react/20/solid";
 import { Button, Tabs } from "@heroui/react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 const LIBRARY_HEADING_ID = "recipe-library-heading";
@@ -24,6 +25,7 @@ const LIBRARY_HEADING_ID = "recipe-library-heading";
 function RecipeLibrary({ isServerAdmin }: { isServerAdmin?: boolean }) {
   const [viewMode, setViewMode] = useRecipeDashboardViewMode();
   const t = useTranslations("recipes.dashboard");
+  const router = useRouter();
   const { selectionMode, enterSelectionMode, exitSelectionMode } = useRecipesContext();
 
   return (
@@ -53,7 +55,7 @@ function RecipeLibrary({ isServerAdmin }: { isServerAdmin?: boolean }) {
                       size="sm"
                       startContent={<TagIcon className="h-4 w-4" />}
                       variant="flat"
-                      href="/settings?tab=admin"
+                      onPress={() => router.push("/settings?tab=admin")}
                     >
                       {t("selection.manageTags")}
                     </Button>
