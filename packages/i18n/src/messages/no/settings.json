@@ -902,7 +902,15 @@
       "deleteLabel": "Slett {name}",
       "deleteConfirm": "Slette taggen \"{name}\" fra alle oppskrifter?",
       "allergy": "Denne taggen brukes som allergi og kan ikke slettes.",
-      "saveFailed": "Lagring mislyktes. Prøv igjen."
+      "saveFailed": "Lagring mislyktes. Prøv igjen.",
+      "willMerge": "Slås sammen med eksisterende tag \"{name}\"",
+      "selectLabel": "Velg {name}",
+      "selectedCount": "{count, plural, one {# tag valgt} other {# tags valgt}}",
+      "mergeSelected": "Slå sammen…",
+      "mergeTitle": "Slå sammen til én tag",
+      "mergeTargetLabel": "Navn på måltag",
+      "deleteSelectedConfirm": "{count, plural, one {Slett den valgte tag-en fra alle oppskrifter?} other {Slett de valgte {count} tag-ene fra alle oppskrifter?}}",
+      "allergyBadge": "allergi"
     }
   },
   "archiveExport": {

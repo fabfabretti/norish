@@ -902,7 +902,15 @@
       "deleteLabel": "{name} verwijderen",
       "deleteConfirm": "De tag \"{name}\" uit elk recept verwijderen?",
       "allergy": "Deze tag wordt als allergie gebruikt en kan niet worden verwijderd.",
-      "saveFailed": "Opslaan mislukt. Probeer het opnieuw."
+      "saveFailed": "Opslaan mislukt. Probeer het opnieuw.",
+      "willMerge": "Wordt samengevoegd in bestaande tag \"{name}\"",
+      "selectLabel": "{name} selecteren",
+      "selectedCount": "{count, plural, one {# tag geselecteerd} other {# tags geselecteerd}}",
+      "mergeSelected": "Samenvoegen…",
+      "mergeTitle": "Samenvoegen in één tag",
+      "mergeTargetLabel": "Naam van doel-tag",
+      "deleteSelectedConfirm": "{count, plural, one {Geselecteerde tag uit alle recepten verwijderen?} other {Geselecteerde {count} tags uit alle recepten verwijderen?}}",
+      "allergyBadge": "allergie"
     }
   },
   "archiveExport": {

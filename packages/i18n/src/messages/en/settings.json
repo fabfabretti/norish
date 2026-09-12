@@ -902,7 +902,15 @@
       "deleteLabel": "Delete {name}",
       "deleteConfirm": "Delete the tag \"{name}\" from every recipe?",
       "allergy": "This tag is used as a household allergy and cannot be deleted.",
-      "saveFailed": "Save failed. Please try again."
+      "saveFailed": "Save failed. Please try again.",
+      "willMerge": "Merges into existing tag \"{name}\"",
+      "selectLabel": "Select {name}",
+      "selectedCount": "{count, plural, one {# tag selected} other {# tags selected}}",
+      "mergeSelected": "Merge into…",
+      "mergeTitle": "Merge into a single tag",
+      "mergeTargetLabel": "Target tag name",
+      "deleteSelectedConfirm": "{count, plural, one {Delete the selected tag from every recipe?} other {Delete the selected {count} tags from every recipe?}}",
+      "allergyBadge": "allergy"
     }
   },
   "archiveExport": {

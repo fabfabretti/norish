@@ -902,7 +902,15 @@
       "deleteLabel": "Usuń {name}",
       "deleteConfirm": "Usunąć tag \"{name}\" ze wszystkich przepisów?",
       "allergy": "Ten tag jest używany jako alergen i nie można go usunąć.",
-      "saveFailed": "Nie udało się zapisać. Spróbuj ponownie."
+      "saveFailed": "Nie udało się zapisać. Spróbuj ponownie.",
+      "willMerge": "Łączy z istniejącym tagiem \"{name}\"",
+      "selectLabel": "Wybierz {name}",
+      "selectedCount": "{count, plural, one {# tag wybrany} other {# tagi wybrane}}",
+      "mergeSelected": "Połącz…",
+      "mergeTitle": "Połącz w jeden tag",
+      "mergeTargetLabel": "Nazwa taga docelowego",
+      "deleteSelectedConfirm": "{count, plural, one {Usunąć wybrany tag ze wszystkich przepisów?} other {Usunąć wybrane {count} tagi ze wszystkich przepisów?}}",
+      "allergyBadge": "alergia"
     }
   },
   "archiveExport": {

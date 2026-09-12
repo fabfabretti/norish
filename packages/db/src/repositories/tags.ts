@@ -355,7 +355,7 @@ export async function bulkRemoveTagsFromRecipes(
   });
 }
 
-export type TagWithUsage = { id: string; name: string; usage: number };
+export type TagWithUsage = { id: string; name: string; usage: number; allergyUsage: number };
 
 /** Every tag with the number of recipes carrying it, for the tag manager. */
 export async function listTagsWithUsage(): Promise<TagWithUsage[]> {
@@ -364,6 +364,7 @@ export async function listTagsWithUsage(): Promise<TagWithUsage[]> {
       id: tags.id,
       name: tags.name,
       usage: sql<number>`count(${recipeTags.tagId})::int`,
+      allergyUsage: sql<number>`(select count(*) from user_allergies where user_allergies.tag_id = tags.id)::int`,
     })
     .from(tags)
     .leftJoin(recipeTags, eq(recipeTags.tagId, tags.id))
