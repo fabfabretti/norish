@@ -902,7 +902,15 @@
       "deleteLabel": "Eliminar {name}",
       "deleteConfirm": "¿Eliminar la etiqueta \"{name}\" de cada receta?",
       "allergy": "Esta etiqueta se usa como alergia y no se puede eliminar.",
-      "saveFailed": "No se pudo guardar. Inténtalo de nuevo."
+      "saveFailed": "No se pudo guardar. Inténtalo de nuevo.",
+      "willMerge": "Se fusiona con la etiqueta existente \"{name}\"",
+      "selectLabel": "Seleccionar {name}",
+      "selectedCount": "{count, plural, one {# etiqueta seleccionada} other {# etiquetas seleccionadas}}",
+      "mergeSelected": "Combinar…",
+      "mergeTitle": "Combinar en una sola etiqueta",
+      "mergeTargetLabel": "Nombre de la etiqueta de destino",
+      "deleteSelectedConfirm": "{count, plural, one {¿Eliminar la etiqueta seleccionada de todas las recetas?} other {¿Eliminar las {count} etiquetas seleccionadas de todas las recetas?}}",
+      "allergyBadge": "alergia"
     }
   },
   "archiveExport": {

@@ -902,7 +902,15 @@
       "deleteLabel": "Изтриване на {name}",
       "deleteConfirm": "Изтриване на етикета \"{name}\" от всяка рецепта?",
       "allergy": "Този етикет се използва като алергия и не може да бъде изтрит.",
-      "saveFailed": "Записването не успе. Опитайте отново."
+      "saveFailed": "Записването не успе. Опитайте отново.",
+      "willMerge": "Обединява се със съществуващия таг \"{name}\"",
+      "selectLabel": "Изберете {name}",
+      "selectedCount": "{count, plural, one {# таг избран} other {# тага избрани}}",
+      "mergeSelected": "Обедини…",
+      "mergeTitle": "Обедини в един таг",
+      "mergeTargetLabel": "Име на целевия таг",
+      "deleteSelectedConfirm": "{count, plural, one {Изтриване на избрания таг от всички рецепти?} other {Изтриване на избраните {count} тага от всички рецепти?}}",
+      "allergyBadge": "алергия"
     }
   },
   "archiveExport": {

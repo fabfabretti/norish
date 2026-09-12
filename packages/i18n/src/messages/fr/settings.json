@@ -902,7 +902,15 @@
       "deleteLabel": "Supprimer {name}",
       "deleteConfirm": "Supprimer l'étiquette « {name} » de chaque recette ?",
       "allergy": "Cette étiquette est utilisée comme allergie et ne peut pas être supprimée.",
-      "saveFailed": "Échec de l'enregistrement. Veuillez réessayer."
+      "saveFailed": "Échec de l'enregistrement. Veuillez réessayer.",
+      "willMerge": "Fusionne dans le tag existant \"{name}\"",
+      "selectLabel": "Sélectionner {name}",
+      "selectedCount": "{count, plural, one {# tag sélectionné} other {# tags sélectionnés}}",
+      "mergeSelected": "Fusionner…",
+      "mergeTitle": "Fusionner dans un seul tag",
+      "mergeTargetLabel": "Nom du tag cible",
+      "deleteSelectedConfirm": "{count, plural, one {Supprimer le tag sélectionné de toutes les recettes ?} other {Supprimer les {count} tags sélectionnés de toutes les recettes ?}}",
+      "allergyBadge": "allergie"
     }
   },
   "archiveExport": {
