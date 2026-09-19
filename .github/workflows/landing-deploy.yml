@@ -19,7 +19,6 @@ concurrency:
 jobs:
   deploy:
     name: Build and deploy to Cloudflare Pages
-    if: github.repository_owner == 'norish-recipes'
     runs-on: ubuntu-latest
     env:
       # norish.dev serves from the root, so no basePath.

@@ -65,7 +65,11 @@ sections (never passing a finished prompt string — ADR-0016).
   applied it — see the 0053–0055 renumber for how this fork did it.
 - **CI:** keep fork CI additive. No `.github/workflows/*` file that exists upstream is
   ever modified here — fork-only workflows live in their own files
-  (`.github/workflows/docker-ci-image.yml`).
+  (`.github/workflows/docker-ci-image.yml`). The four upstream release/deploy
+  workflows (`release-build`, `rc-release-build`, `docs-deploy`, `landing-deploy`)
+  are disabled in this fork repo's Actions settings, not by editing their files;
+  keep them disabled so a synced `main` never triggers upstream's release or
+  deploys to norish.dev.
 
 ## Agent skills
 
