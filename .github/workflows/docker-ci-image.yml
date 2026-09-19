@@ -1,17 +1,17 @@
 name: Docker CI image (fork test)
 
-# Temporary: builds and publishes a test image from the current branch so a
-# local instance can test it without running the heavy Docker build at home.
-#
-# This is a fork-local variant of the release build: it pushes only to the
-# fork's own GHCR (never Docker Hub, which the release build needs secrets
-# this fork does not have) and reads the upstream layer cache to stay fast.
-# Remove once the caption-first import experiment is done.
+# Fork-local variant of the release build: builds and publishes a test image
+# from the current branch so a local instance can test it without running the
+# heavy Docker build at home. It pushes only to the fork's own GHCR (never
+# Docker Hub, which the release build needs secrets this fork does not have)
+# and reads the upstream layer cache to stay fast. This file does not exist
+# upstream; keep all fork CI additive in files of its own.
 
 on:
   push:
     branches:
-      - feature/social-caption-first
+      - main
+      - "feature/**"
   workflow_dispatch:
 
 permissions:
