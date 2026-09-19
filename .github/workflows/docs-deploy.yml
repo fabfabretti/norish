@@ -19,6 +19,7 @@ concurrency:
 jobs:
   deploy:
     name: Build and deploy docs to Cloudflare Pages
+    if: github.repository_owner == 'norish-recipes'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

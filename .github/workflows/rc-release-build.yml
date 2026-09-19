@@ -23,11 +23,16 @@ jobs:
   # without it going green.
   quality:
     name: Quality
+    if: github.repository_owner == 'norish-recipes'
     uses: ./.github/workflows/_node-ci.yml
     secrets: inherit
+    with:
+      # E2E is covered by the Docker build test; skip here to save ~2-3 min.
+      skip-e2e: true
 
   prepare-release:
     name: Create RC tag
+    if: github.repository_owner == 'norish-recipes'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [quality]
@@ -54,6 +59,7 @@ jobs:
 
   docker-publish:
     name: Publish
+    if: github.repository_owner == 'norish-recipes'
     uses: ./.github/workflows/_docker-build.yml
     needs: prepare-release
     secrets: inherit

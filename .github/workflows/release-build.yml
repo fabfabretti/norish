@@ -15,11 +15,13 @@ permissions:
 jobs:
   quality:
     name: Quality
+    if: github.repository_owner == 'norish-recipes'
     uses: ./.github/workflows/_node-ci.yml
     secrets: inherit
 
   prepare-release:
     name: Create release tag
+    if: github.repository_owner == 'norish-recipes'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [quality]
@@ -50,6 +52,7 @@ jobs:
 
   docker-promote:
     name: Promote images
+    if: github.repository_owner == 'norish-recipes'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: prepare-release
