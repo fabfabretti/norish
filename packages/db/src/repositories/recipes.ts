@@ -533,6 +533,42 @@ function toDashboardRecipe(r: DashboardRow) {
   };
 }
 
+export type TagRule = { tagIds: string[]; matchMode: FilterMode };
+
+/**
+ * Every recipe carrying a tag rule's tags.
+ *
+ * The same in-memory recipe-to-tag map and every/some pick the list's own tag
+ * filter applies to names — this one reads ids, which is what a rule stores.
+ * Not policy-filtered: the caller reads whatever it needs under the viewer's
+ * view policy afterwards, exactly as a tag search matches first and filters
+ * later (ADR-0027).
+ */
+export async function matchTagRuleRecipeIds(rule: TagRule): Promise<string[]> {
+  const tagRelations = await db.query.recipeTags.findMany({
+    columns: { recipeId: true, tagId: true },
+  });
+
+  const recipeTagMap = new Map<string, Set<string>>();
+
+  for (const rel of tagRelations) {
+    if (!rel.tagId) continue;
+
+    if (!recipeTagMap.has(rel.recipeId)) {
+      recipeTagMap.set(rel.recipeId, new Set());
+    }
+    recipeTagMap.get(rel.recipeId)!.add(rel.tagId);
+  }
+
+  return Array.from(recipeTagMap.entries())
+    .filter(([, tagSet]) =>
+      rule.matchMode === "AND"
+        ? rule.tagIds.every((id) => tagSet.has(id))
+        : rule.tagIds.some((id) => tagSet.has(id))
+    )
+    .map(([recipeId]) => recipeId);
+}
+
 export async function listRecipes(
   ctx: RecipeListContext,
   limit: number,
@@ -551,8 +587,12 @@ export async function listRecipes(
    * and filters for free — and the members answer the same view policy the
    * Library applies, which is what makes a cookbook's count and its list
    * agree by construction (ADR-0027).
+   *
+   * A smart cookbook passes its `rule` instead of a `cookbookId`: its members
+   * are derived at read time, so the intersection with the reader's own
+   * filters happens in the same SQL that would have filtered the join table.
    */
-  options?: { cookbookId?: string; favoritesOnly?: boolean }
+  options?: { cookbookId?: string; favoritesOnly?: boolean; rule?: TagRule }
 ): Promise<{ recipes: RecipeDashboardDTO[]; total: number }> {
   const whereConditions: any[] = [];
 
@@ -585,6 +625,16 @@ export async function listRecipes(
           AND membership.recipe_id = "recipes"."id"
       )`
     );
+  }
+
+  // A smart cookbook's members are derived, so the rule stands in for the
+  // join table: the ids the rule matches are the whole candidate set, and
+  // everything else — the policy, the reader's own filters — intersects them
+  // in the same query.
+  if (options?.rule) {
+    const ruleRecipeIds = await matchTagRuleRecipeIds(options.rule);
+
+    whereConditions.push(inArray(recipes.id, ruleRecipeIds));
   }
 
   // Build full-text search with weighted ranking, through the one builder

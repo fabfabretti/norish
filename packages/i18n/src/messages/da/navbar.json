@@ -31,7 +31,8 @@
   "nav": {
     "home": "Opskrifter",
     "calendar": "Kalender",
-    "groceries": "Indkøbsliste"
+    "groceries": "Indkøbsliste",
+    "collections": "Collections"
   },
   "mobile": {
     "searchPlaceholder": "Søg opskrifter...",

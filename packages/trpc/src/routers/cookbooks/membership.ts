@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import type { FilterMode, SortOrder } from "@norish/shared/contracts";
@@ -41,7 +42,16 @@ const setMembership = authedProcedure
   .input(CookbookMembershipInputSchema)
   .mutation(async ({ ctx, input }) => {
     await assertRecipeAccess(ctx, input.recipeId, "view");
-    await assertCookbookAccess(ctx, input.cookbookId, "edit");
+    const cookbook = await assertCookbookAccess(ctx, input.cookbookId, "edit");
+
+    // A smart cookbook derives its members from its rule; filing into it by
+    // hand would fight the tag match every read afterwards.
+    if (cookbook.rule.kind === "tags") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "A tag-driven cookbook's members are derived from its rule, not filed",
+      });
+    }
 
     if (input.isMember) {
       // Idempotent by the unique pair, so a double tap changes nothing.
@@ -104,7 +114,15 @@ const recipes = authedProcedure
   .output(RecipeListResultSchema)
   .query(async ({ ctx, input }) => {
     // Seeing a cookbook is enough to browse it; the members filter themselves.
-    await assertCookbookAccess(ctx, input.cookbookId, "view");
+    const cookbook = await assertCookbookAccess(ctx, input.cookbookId, "view");
+
+    // A smart cookbook's members are the recipes its rule matches, so the
+    // rule stands in for the membership EXISTS — both under the reader's own
+    // sort, search and filters, and both answering the same view policy.
+    const scope =
+      cookbook.rule.kind === "tags"
+        ? { rule: { tagIds: cookbook.rule.tagIds, matchMode: cookbook.rule.matchMode } }
+        : { cookbookId: input.cookbookId };
 
     const result = await listRecipes(
       listContextFor(ctx),
@@ -118,7 +136,7 @@ const recipes = authedProcedure
       input.minRating,
       input.maxCookingTime,
       input.categories,
-      { cookbookId: input.cookbookId, favoritesOnly: input.favoritesOnly }
+      { ...scope, favoritesOnly: input.favoritesOnly }
     );
 
     return {
@@ -141,9 +159,9 @@ const memberIds = authedProcedure
   .input(CookbookMemberIdsInputSchema)
   .output(z.array(z.string()))
   .query(async ({ ctx, input }) => {
-    await assertCookbookAccess(ctx, input.cookbookId, "view");
+    const cookbook = await assertCookbookAccess(ctx, input.cookbookId, "view");
 
-    return listCookbookMemberIds(input.cookbookId);
+    return listCookbookMemberIds(input.cookbookId, cookbook.rule);
   });
 
 export const cookbookMembershipProcedures = router({

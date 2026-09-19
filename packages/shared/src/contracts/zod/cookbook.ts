@@ -13,6 +13,26 @@ export const CookbookTitleSchema = z.string().trim().min(1).max(120);
 export const COOKBOOK_DESCRIPTION_TITLE_LIMIT = 6;
 
 /**
+ * What makes a cookbook automatic rather than hand-filed.
+ *
+ * `"manual"` is the default — every hand-curated cookbook carries it. A smart
+ * cookbook holds the tag rule its members are derived from; the same
+ * `matchMode` the recipe list filters by (AND/OR) decides whether a recipe
+ * needs every chosen tag or any of them.
+ */
+export const CookbookRuleSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("manual"),
+  }),
+  z.object({
+    kind: z.literal("tags"),
+    /** At least one tag: a rule naming nothing is a rule that matches nothing. */
+    tagIds: z.array(z.uuid()).min(1),
+    matchMode: z.enum(["AND", "OR"]),
+  }),
+]);
+
+/**
  * A cookbook as every list and card reads it.
  *
  * Everything below `version` is viewer-scoped: it answers the same view
@@ -20,15 +40,16 @@ export const COOKBOOK_DESCRIPTION_TITLE_LIMIT = 6;
  * counts for the same cookbook and what a card says always agrees with what
  * is on screen (ADR-0027).
  *
- * A cookbook still stores nothing but its title. The description and the
- * metadata a card shows are derived from its members at read time, exactly
- * as the cover is, so they can never go stale and there is nothing to
+ * A cookbook still stores nothing but its title and rule. The description and
+ * the metadata a card shows are derived from its members at read time,
+ * exactly as the cover is, so they can never go stale and there is nothing to
  * maintain.
  */
 export const CookbookSummarySchema = z.object({
   id: z.uuid(),
   userId: z.string().nullable(),
   title: z.string(),
+  rule: CookbookRuleSchema,
   createdAt: z.date(),
   updatedAt: z.date(),
   version: z.number().int(),
@@ -63,9 +84,15 @@ export const CookbookCreateInputSchema = z.object({
   id: clientMintedId,
   title: CookbookTitleSchema,
   /**
+   * The make-it-automatic rule. Leave it out for a hand-curated cookbook, or
+   * give it a tag rule and the cookbook's members are derived rather than
+   * filed (ADR-0027).
+   */
+  rule: CookbookRuleSchema.optional(),
+  /**
    * File this recipe into the new cookbook in one step, so "these two belong
    * together" is one decision rather than two. Needs view rights on the
-   * recipe and nothing more (ADR-0027).
+   * recipe and nothing more (ADR-0027). Manual cookbooks only.
    */
   recipeId: z.uuid().optional(),
 });
@@ -97,6 +124,19 @@ export const CookbookRenameInputSchema = z.object({
   id: z.uuid(),
   version: z.number().int().positive(),
   title: CookbookTitleSchema,
+});
+
+/**
+ * Edit a cookbook's rule under optimistic concurrency, exactly like a rename.
+ *
+ * A smart cookbook is rule-editable and nothing else: turning one into
+ * "manual" gives it an empty set, but the file-in panel reads the rule and
+ * will never offer it, so the two halves cannot disagree.
+ */
+export const CookbookRuleUpdateInputSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  rule: CookbookRuleSchema,
 });
 
 export const CookbookDeleteInputSchema = z.object({

@@ -402,6 +402,18 @@
     "searchRecipes": "레시피 검색",
     "noRecipesToAdd": "레시피를 찾을 수 없습니다.",
     "addCount": "{count, plural, other {레시피 #개 추가}}",
-    "everythingAlreadyIn": "모든 레시피가 이미 이 요리책에 있습니다."
+    "everythingAlreadyIn": "모든 레시피가 이미 이 요리책에 있습니다.",
+    "smartMembersNote": "This collection's contents come from its tag rule. Edit the rule from the card to change what is in it."
+  },
+  "collections": {
+    "title": "Collections",
+    "smartBadge": "Auto",
+    "createSmartTitle": "New smart collection",
+    "editSmartTitle": "Edit collection",
+    "tagsLabel": "Tags",
+    "matchesAnd": "Every tag",
+    "matchesOr": "Any tag",
+    "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
+    "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
   }
 }

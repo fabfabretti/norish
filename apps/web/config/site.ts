@@ -16,6 +16,10 @@ export const siteConfig = {
       label: "Calendar",
       href: "/calendar",
     },
+    {
+      label: "Collections",
+      href: "/collections",
+    },
   ],
   navMenuItems: [
     {

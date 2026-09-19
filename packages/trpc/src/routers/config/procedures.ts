@@ -4,7 +4,7 @@ import { getAvailableProviders, isPasswordAuthEnabled } from "@norish/auth/provi
 import { buildInternalParserApiUrl, SERVER_CONFIG } from "@norish/config/env-config-server";
 import { getDatabaseHealth } from "@norish/db/drizzle";
 import { listCuisines } from "@norish/db/repositories/cuisines";
-import { listAllTagNames, listTagNamesForUsers } from "@norish/db/repositories/tags";
+import { listAllTagNames, listAllTags, listTagNamesForUsers, listTagsForUsers } from "@norish/db/repositories/tags";
 import { getAppVersions, trpcLogger as log } from "@norish/shared-server";
 import {
   getLocaleConfig,
@@ -127,6 +127,22 @@ const tags = authedProcedure.query(async ({ ctx }) => {
 });
 
 /**
+ * The rule builder's tag list: every tag the reader can see, with the id the
+ * smart cookbook rules are written in. The names-only `tags` read feeds tag
+ * inputs; a rule cannot live on names (a rename would silently re-match) so
+ * the editor gets the id alongside.
+ */
+const tagCatalog = authedProcedure.query(async ({ ctx }) => {
+  const policy = await getRecipePermissionPolicy();
+  const tags =
+    policy.view === "everyone" || ctx.isServerAdmin
+      ? await listAllTags()
+      : await listTagsForUsers(ctx.userIds);
+
+  return { tags };
+});
+
+/**
  * Get the deployment's Cuisine vocabulary.
  *
  * Unscoped on purpose: unlike Tags, which grow out of whichever recipes a user
@@ -246,6 +262,7 @@ export const health = publicProcedure
 export const configProcedures = router({
   localeConfig,
   tags,
+  tagCatalog,
   cuisines,
   units,
   recurrenceConfig,
