@@ -892,6 +892,25 @@
       "empty": "Noch keine Küchen.",
       "duplicate": "Eine Küche mit diesem Namen existiert bereits.",
       "saveFailed": "Diese Küche konnte nicht gespeichert werden."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Das Umbenennen oder Zusammenführen eines Tags betrifft jedes Rezept, das ihn trägt; das Löschen entfernt ihn überall. Ein Tag, den ein Haushalt als Allergie angibt, kann nicht gelöscht werden.",
+      "empty": "Noch keine Tags.",
+      "usage": "{count, plural, one {# Rezept} other {# Rezepte}}",
+      "renameLabel": "{name} umbenennen",
+      "deleteLabel": "{name} löschen",
+      "deleteConfirm": "Den Tag \"{name}\" aus jedem Rezept löschen?",
+      "allergy": "Dieser Tag wird als Allergie verwendet und kann nicht gelöscht werden.",
+      "saveFailed": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
+      "willMerge": "Wird in vorhandenes Tag \"{name}\" zusammengeführt",
+      "selectLabel": "{name} auswählen",
+      "selectedCount": "{count, plural, one {# Tag ausgewählt} other {# Tags ausgewählt}}",
+      "mergeSelected": "Zusammenführen…",
+      "mergeTitle": "In ein einzelnes Tag zusammenführen",
+      "mergeTargetLabel": "Name des Ziel-Tags",
+      "deleteSelectedConfirm": "{count, plural, one {Ausgewähltes Tag aus allen Rezepten löschen?} other {Ausgewählte {count} Tags aus allen Rezepten löschen?}}",
+      "allergyBadge": "Allergie"
     }
   },
   "archiveExport": {

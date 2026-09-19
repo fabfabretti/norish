@@ -257,6 +257,159 @@ export async function attachTagsToRecipeByInputTx(
   await deleteOrphanedTagsTx(tx);
 }
 
+/**
+ * Add tags to many recipes at once, creating missing tags as needed.
+ * Returns the recipe ids that actually changed (each bumped one version).
+ */
+export async function bulkAddTagsToRecipes(
+  recipeIds: string[],
+  names: readonly string[]
+): Promise<string[]> {
+  const cleaned = names.map((n) => stripHtmlTags(n).trim()).filter((n) => n.length > 0);
+
+  if (recipeIds.length === 0 || cleaned.length === 0) return [];
+
+  const uniqueIds = Array.from(new Set(recipeIds));
+
+  return await db.transaction(async (tx) => {
+    const tagIds = (await getOrCreateManyTagsTx(tx, cleaned)).map((t) => t.id);
+    const affected: string[] = [];
+
+    for (const recipeId of uniqueIds) {
+      const existing = await tx
+        .select({ tagId: recipeTags.tagId })
+        .from(recipeTags)
+        .where(and(eq(recipeTags.recipeId, recipeId), inArray(recipeTags.tagId, tagIds)));
+
+      const present = new Set(existing.map((r) => r.tagId));
+      const missing = tagIds.filter((id) => !present.has(id));
+
+      if (missing.length === 0) continue;
+
+      const maxOrder = await tx
+        .select({ max: sql<number>`max(${recipeTags.order})` })
+        .from(recipeTags)
+        .where(eq(recipeTags.recipeId, recipeId))
+        .then((rows) => rows[0]?.max ?? -1);
+
+      await tx
+        .insert(recipeTags)
+        .values(missing.map((tagId, index) => ({ recipeId, tagId, order: maxOrder + 1 + index })));
+
+      await tx
+        .update(recipes)
+        .set({ updatedAt: new Date(), version: sql`${recipes.version} + 1` })
+        .where(eq(recipes.id, recipeId));
+
+      affected.push(recipeId);
+    }
+
+    return affected;
+  });
+}
+
+/**
+ * Remove tags from many recipes at once, cleaning up any tags left unused.
+ * Returns the recipe ids that actually changed (each bumped one version).
+ */
+export async function bulkRemoveTagsFromRecipes(
+  recipeIds: string[],
+  names: readonly string[]
+): Promise<string[]> {
+  const cleaned = names.map((n) => stripHtmlTags(n).trim()).filter((n) => n.length > 0);
+
+  if (recipeIds.length === 0 || cleaned.length === 0) return [];
+
+  const uniqueIds = Array.from(new Set(recipeIds));
+
+  return await db.transaction(async (tx) => {
+    const lowers = Array.from(new Set(cleaned.map((n) => n.toLowerCase())));
+    const rows = await tx
+      .select({ id: tags.id })
+      .from(tags)
+      .where(inArray(sql`lower(${tags.name})`, lowers));
+
+    if (rows.length === 0) return [];
+
+    const tagIds = rows.map((r) => r.id);
+    const affected: string[] = [];
+
+    for (const recipeId of uniqueIds) {
+      const deleted = await tx
+        .delete(recipeTags)
+        .where(and(eq(recipeTags.recipeId, recipeId), inArray(recipeTags.tagId, tagIds)));
+
+      if ((deleted.rowCount ?? 0) === 0) continue;
+
+      await tx
+        .update(recipes)
+        .set({ updatedAt: new Date(), version: sql`${recipes.version} + 1` })
+        .where(eq(recipes.id, recipeId));
+
+      affected.push(recipeId);
+    }
+
+    await deleteOrphanedTagsTx(tx);
+
+    return affected;
+  });
+}
+
+export type TagWithUsage = { id: string; name: string; usage: number; allergyUsage: number };
+
+/** Every tag with the number of recipes carrying it, for the tag manager. */
+export async function listTagsWithUsage(): Promise<TagWithUsage[]> {
+  return await db
+    .select({
+      id: tags.id,
+      name: tags.name,
+      usage: sql<number>`count(${recipeTags.tagId})::int`,
+      allergyUsage: sql<number>`(select count(*) from user_allergies where user_allergies.tag_id = tags.id)::int`,
+    })
+    .from(tags)
+    .leftJoin(recipeTags, eq(recipeTags.tagId, tags.id))
+    .groupBy(tags.id)
+    .orderBy(sql`lower(${tags.name})`);
+}
+
+/**
+ * Delete a tag everywhere. Refuses tags referenced as a household allergy —
+ * deleting those would cascade safety data (user_allergies onDelete cascade).
+ * Returns the recipe ids that lost the tag.
+ */
+export async function deleteTagCompletely(tagId: string): Promise<string[]> {
+  return await db.transaction(async (tx) => {
+    const allergyRefs = await tx
+      .select({ tagId: userAllergies.tagId })
+      .from(userAllergies)
+      .where(eq(userAllergies.tagId, tagId))
+      .limit(1);
+
+    if (allergyRefs.length > 0) {
+      throw new Error("A tag used as a household allergy cannot be deleted");
+    }
+
+    const affected = await tx
+      .select({ recipeId: recipeTags.recipeId })
+      .from(recipeTags)
+      .where(eq(recipeTags.tagId, tagId))
+      .orderBy(recipeTags.recipeId)
+      .then((rows) => rows.map((r) => r.recipeId));
+
+    await tx.delete(recipeTags).where(eq(recipeTags.tagId, tagId));
+    await tx.delete(tags).where(eq(tags.id, tagId));
+
+    for (const recipeId of affected) {
+      await tx
+        .update(recipes)
+        .set({ updatedAt: new Date(), version: sql`${recipes.version} + 1` })
+        .where(eq(recipes.id, recipeId));
+    }
+
+    return affected;
+  });
+}
+
 export async function getRecipeTagNames(recipeId: string): Promise<string[]> {
   const rows = await db
     .select({ name: tags.name })
@@ -320,11 +473,48 @@ export async function updateTagName(
       .then((rows) => rows[0]);
 
     if (existingTag) {
-      // Merge: update all recipe_tags to point to existing tag, delete old tag
-      await tx
-        .update(recipeTags)
-        .set({ tagId: existingTag.id, version: sql`${recipeTags.version} + 1` })
+      // Merge: point every recipe_tag at the surviving tag. A recipe that
+      // already carries both tags would violate the (recipe, tag) primary key
+      // on a blind UPDATE, so skip those — they are already merged. Allergies
+      // follow to the surviving tag instead of being cascade-deleted by the
+      // old-tag drop; deleting those rows would lose safety data.
+      const rows = await tx
+        .select({ recipeId: recipeTags.recipeId })
+        .from(recipeTags)
         .where(eq(recipeTags.tagId, oldTag.id));
+
+      for (const row of rows) {
+        const already = await tx
+          .select({ tagId: recipeTags.tagId })
+          .from(recipeTags)
+          .where(and(eq(recipeTags.recipeId, row.recipeId), eq(recipeTags.tagId, existingTag.id)))
+          .limit(1);
+
+        if (already.length > 0) continue;
+
+        await tx
+          .update(recipeTags)
+          .set({ tagId: existingTag.id, version: sql`${recipeTags.version} + 1` })
+          .where(and(eq(recipeTags.recipeId, row.recipeId), eq(recipeTags.tagId, oldTag.id)));
+      }
+
+      // Rows that were skipped (the recipe already held both tags) still point
+      // at the old tag and would block its deletion via the FK, so drop them.
+      await tx.delete(recipeTags).where(eq(recipeTags.tagId, oldTag.id));
+
+      const allergyUsers = await tx
+        .select({ userId: userAllergies.userId })
+        .from(userAllergies)
+        .where(eq(userAllergies.tagId, oldTag.id));
+
+      await tx.delete(userAllergies).where(eq(userAllergies.tagId, oldTag.id));
+
+      if (allergyUsers.length > 0) {
+        await tx
+          .insert(userAllergies)
+          .values(allergyUsers.map((u) => ({ userId: u.userId, tagId: existingTag.id })))
+          .onConflictDoNothing();
+      }
 
       await tx.delete(tags).where(eq(tags.id, oldTag.id));
 

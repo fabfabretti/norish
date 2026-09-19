@@ -27,6 +27,11 @@
       "all": "Alles",
       "recipes": "Recepten",
       "cookbooks": "Kookboeken"
+    },
+    "selection": {
+      "select": "Selecteren",
+      "cancel": "Annuleren",
+      "manageTags": "Tags beheren"
     }
   },
   "back": {
@@ -415,5 +420,15 @@
     "matchesOr": "Any tag",
     "ruleHint": "Recipes carrying the chosen tags join this collection automatically.",
     "empty": "No collections yet. A collection is a cookbook, and a smart one gathers itself."
+  },
+  "bulk": {
+    "selected": "{count, plural, one {# geselecteerd} other {# geselecteerd}}",
+    "addTags": "Tags toevoegen",
+    "removeTags": "Tags verwijderen",
+    "done": "Klaar",
+    "addTitle": "Tags aan selectie toevoegen",
+    "removeTitle": "Tags uit selectie verwijderen",
+    "applyAdd": "Toevoegen",
+    "applyRemove": "Verwijderen"
   }
 }

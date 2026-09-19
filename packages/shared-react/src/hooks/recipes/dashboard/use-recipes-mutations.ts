@@ -272,6 +272,7 @@ export type RecipesMutationsResult = {
   updateRecipe: (id: string, input: FullRecipeUpdateDTO) => void;
   deleteRecipe: (id: string, version: number) => void;
   convertMeasurements: (recipeId: string, system: MeasurementSystem, version: number) => void;
+  bulkTags: (recipeIds: string[], tags: { add?: string[]; remove?: string[] }) => void;
 };
 
 export type RecipesMutationErrorHandler = (error: unknown, operation: string) => void;
@@ -515,6 +516,7 @@ export function createUseRecipesMutations(
       })
     );
     const convertMutation = useMutation(trpc.recipes.convertMeasurements.mutationOptions());
+    const bulkTagsMutation = useMutation(trpc.recipes.bulkTags.mutationOptions());
 
     const restoreDeletedRecipe = (context: DeleteMutationContext | undefined): void => {
       if (!context) {
@@ -644,6 +646,26 @@ export function createUseRecipesMutations(
       pasteImportMutation.mutate({ text, forceAI: true });
     };
 
+    const bulkTags = (recipeIds: string[], tags: { add?: string[]; remove?: string[] }): void => {
+      bulkTagsMutation.mutate(
+        { recipeIds, ...tags },
+        {
+          onError: (error) => {
+            onError?.(error, "bulkTags");
+
+            if (!shouldPreserve(error)) {
+              invalidate();
+            }
+          },
+          onSuccess: () => {
+            // The server emits per-recipe updates, but the library list is
+            // cheaper to refetch wholesale than to patch page by page.
+            invalidate();
+          },
+        }
+      );
+    };
+
     return {
       importRecipe,
       importRecipeWithAI,
@@ -654,6 +676,7 @@ export function createUseRecipesMutations(
       updateRecipe,
       deleteRecipe,
       convertMeasurements,
+      bulkTags,
     };
   };
 }

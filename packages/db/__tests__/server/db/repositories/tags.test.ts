@@ -6,11 +6,17 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@norish/db/drizzle";
 import {
   attachTagsToRecipeByInputTx,
+  bulkAddTagsToRecipes,
+  bulkRemoveTagsFromRecipes,
+  deleteTagCompletely,
+  findTagById,
   findTagByName,
   getRecipeTagNames,
   listAllTagNames,
+  listTagsWithUsage,
+  updateTagName,
 } from "@norish/db/repositories/tags";
-import { userAllergies } from "@norish/db/schema";
+import { recipes, userAllergies } from "@norish/db/schema";
 
 import { createTestRecipe, createTestUser } from "../../../helpers/db-test-helpers";
 import { RepositoryTestBase } from "../../../helpers/repository-test-base";
@@ -90,5 +96,137 @@ describe("Tags Repository", () => {
       .where(eq(userAllergies.userId, testRecipe.userId));
 
     expect(allergies).toEqual([{ tagId: tag!.id }]);
+  });
+
+  it("bulk adds tags to many recipes and bumps version", async () => {
+    const user = await createTestUser();
+    const r1 = await createTestRecipe(user.id, { name: "R1" });
+    const r2 = await createTestRecipe(user.id, { name: "R2" });
+
+    const affected = await bulkAddTagsToRecipes([r1.id, r2.id], ["vegan", "quick"]);
+
+    expect(affected.sort()).toEqual([r1.id, r2.id].sort());
+    expect(await getRecipeTagNames(r1.id)).toEqual(["vegan", "quick"]);
+    expect(await getRecipeTagNames(r2.id)).toEqual(["vegan", "quick"]);
+
+    const v1 = await db
+      .select({ version: recipes.version })
+      .from(recipes)
+      .where(eq(recipes.id, r1.id));
+    const v2 = await db
+      .select({ version: recipes.version })
+      .from(recipes)
+      .where(eq(recipes.id, r2.id));
+    expect(v1[0].version).toBe(2);
+    expect(v2[0].version).toBe(2);
+  });
+
+  it("bulk removes tags from many recipes and cleans orphans", async () => {
+    const user = await createTestUser();
+    const r1 = await createTestRecipe(user.id, { name: "R1" });
+    const r2 = await createTestRecipe(user.id, { name: "R2" });
+
+    await bulkAddTagsToRecipes([r1.id, r2.id], ["vegan", "quick", "spicy"]);
+    expect(await listAllTagNames()).toContain("spicy");
+
+    const affected = await bulkRemoveTagsFromRecipes([r1.id], ["spicy"]);
+
+    expect(affected).toEqual([r1.id]);
+    expect(await getRecipeTagNames(r1.id)).toEqual(["vegan", "quick"]);
+    expect(await getRecipeTagNames(r2.id)).toEqual(["vegan", "quick", "spicy"]);
+    expect(await listAllTagNames()).toContain("spicy");
+
+    await bulkRemoveTagsFromRecipes([r2.id], ["spicy"]);
+    expect(await listAllTagNames()).not.toContain("spicy");
+  });
+
+  it("listTagsWithUsage returns count per tag", async () => {
+    const user = await createTestUser();
+    const r1 = await createTestRecipe(user.id, { name: "R1" });
+    const r2 = await createTestRecipe(user.id, { name: "R2" });
+
+    await bulkAddTagsToRecipes([r1.id, r2.id], ["vegan", "quick"]);
+    await bulkAddTagsToRecipes([r1.id], ["spicy"]);
+
+    const tags = await listTagsWithUsage();
+    const byName = Object.fromEntries(tags.map((t) => [t.name, t.usage]));
+
+    expect(byName.vegan).toBe(2);
+    expect(byName.quick).toBe(2);
+    expect(byName.spicy).toBe(1);
+  });
+
+  it("deleteTagCompletely refuses allergy-linked tag and deletes others", async () => {
+    const user = await createTestUser();
+    const r1 = await createTestRecipe(user.id, { name: "R1" });
+    const r2 = await createTestRecipe(user.id, { name: "R2" });
+
+    await bulkAddTagsToRecipes([r1.id, r2.id], ["vegan"]);
+    await bulkAddTagsToRecipes([r1.id], ["nuts"]);
+
+    const nutsTag = await findTagByName("nuts");
+    expect(nutsTag).not.toBeNull();
+    await db.insert(userAllergies).values({ userId: r1.userId, tagId: nutsTag!.id });
+
+    await expect(deleteTagCompletely(nutsTag!.id)).rejects.toThrow("household allergy");
+
+    const veganTag = await findTagByName("vegan");
+    const affected = await deleteTagCompletely(veganTag!.id);
+    expect(affected.sort()).toEqual([r1.id, r2.id].sort());
+
+    expect(await findTagByName("vegan")).toBeNull();
+    expect(await getRecipeTagNames(r1.id)).toEqual(["nuts"]);
+    expect(await getRecipeTagNames(r2.id)).toEqual([]);
+
+    const v1 = await db
+      .select({ version: recipes.version })
+      .from(recipes)
+      .where(eq(recipes.id, r1.id));
+    const v2 = await db
+      .select({ version: recipes.version })
+      .from(recipes)
+      .where(eq(recipes.id, r2.id));
+    expect(v1[0].version).toBe(4); // create, add vegan, add nuts, delete vegan
+    expect(v2[0].version).toBe(3); // create, add vegan, delete vegan
+  });
+
+  it("renames a tag into an existing one and merges recipes that carry both", async () => {
+    const u1 = await createTestUser();
+    const u2 = await createTestUser();
+    const r1 = await createTestRecipe(u1.id, { name: "R1" });
+    const r2 = await createTestRecipe(u2.id, { name: "R2" });
+
+    await bulkAddTagsToRecipes([r1.id, r2.id], ["vegan"]);
+    await bulkAddTagsToRecipes([r1.id], ["vegano"]);
+
+    const veganTag = await findTagByName("vegan");
+    const veganoTag = await findTagByName("vegano");
+
+    expect(veganTag).not.toBeNull();
+    expect(veganoTag).not.toBeNull();
+
+    await db.insert(userAllergies).values({ userId: r1.userId, tagId: veganTag!.id });
+    await db.insert(userAllergies).values({ userId: r2.userId, tagId: veganoTag!.id });
+
+    const result = await updateTagName("vegan", "vegano");
+
+    expect(result.merged).toBe(true);
+    expect(await findTagByName("vegan")).toBeNull();
+
+    // r1 carried both tags: it keeps a single row pointing at the survivor
+    // (with the generic name), r2 only carried "vegan" and gets redirected.
+    expect(await getRecipeTagNames(r1.id)).toEqual(["vegano"]);
+    expect(await getRecipeTagNames(r2.id)).toEqual(["vegano"]);
+
+    // Allergies follow the merged tag: r1's "vegan" allergy re-points to
+    // vegano, r2's pre-existing vegano allergy is left untouched. Nothing is
+    // dropped by the old-tag deletion.
+    const allergies = await db
+      .select({ userId: userAllergies.userId })
+      .from(userAllergies)
+      .where(eq(userAllergies.tagId, veganoTag!.id))
+      .orderBy(userAllergies.userId);
+
+    expect(allergies).toEqual([{ userId: r1.userId }, { userId: r2.userId }]);
   });
 });

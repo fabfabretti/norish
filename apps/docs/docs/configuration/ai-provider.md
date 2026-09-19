@@ -125,9 +125,33 @@ whether it runs automatically:
 
 | Strategy                       | Behaviour                                          |
 | ------------------------------ | -------------------------------------------------- |
-| **Predefined tags only**       | Only Norish's built-in tag list                    |
-| **Predefined + existing tags** | Also tags already used by recipes on this instance |
+| **Predefined tags only**       | Only Norish's built-in tag kit                     |
+| **Predefined + existing tags** | The kit, plus tags already used by recipes on this instance |
 | **AI can create new tags**     | May invent new tags when nothing fits              |
+
+The kit is enforced in code, not promised by the prompt: anything else the model
+returns is discarded before a tag is stored, under any strategy but the last one.
+
+The kit:
+
+- **Dietary:** Vegetarian, Vegan, High-Protein
+- **Methods:** Air Fryer, Slow Cooker, One-Pot, Grilled, Baked, Fried, Raw,
+  Roasted, Steamed
+- **Dish type:** Main Dish, Side Dish, Dessert, Snack, Other
+- **Qualities:** Budget-Friendly, Meal-Prep, Quick Meal
+
+Under every strategy but **AI can create new tags**, the model may also name a
+single main ingredient of the recipe (for example "shrimp", "chicken", "tofu")
+in English. Seasonings and kitchen staples — salt, oil, butter, sugar, water and
+so on — are always discarded, as are glued words, adjectives, and non-English
+phrases. A recipe's culinary tradition still belongs to its **Cuisines** and a
+meal occasion to its **Categories**, never to its tags. Around these carve-outs
+the code trusts the model's word, because recipes and their ingredients can come
+in any language while tags are always English.
+
+Under **Predefined + existing tags**, the existing tags are matched by name, so a
+recipe can pick up vocational words the admin added through the Tags manager
+under **Settings => Admin => Tags**.
 
 Turning automatic auto-tagging off keeps the selected strategy for manual runs.
 

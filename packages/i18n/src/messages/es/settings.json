@@ -892,6 +892,25 @@
       "empty": "Aún no hay cocinas.",
       "duplicate": "Ya existe una cocina con ese nombre.",
       "saveFailed": "No se pudo guardar esa cocina."
+    },
+    "tags": {
+      "title": "Etiquetas",
+      "description": "Renombrar o fusionar una etiqueta afecta a cada receta que la lleva; eliminarla la quita de todas partes. Una etiqueta que algún hogar declare como alergia no se puede eliminar.",
+      "empty": "Aún no hay etiquetas.",
+      "usage": "{count, plural, one {# receta} other {# recetas}}",
+      "renameLabel": "Renombrar {name}",
+      "deleteLabel": "Eliminar {name}",
+      "deleteConfirm": "¿Eliminar la etiqueta \"{name}\" de cada receta?",
+      "allergy": "Esta etiqueta se usa como alergia y no se puede eliminar.",
+      "saveFailed": "No se pudo guardar. Inténtalo de nuevo.",
+      "willMerge": "Se fusiona con la etiqueta existente \"{name}\"",
+      "selectLabel": "Seleccionar {name}",
+      "selectedCount": "{count, plural, one {# etiqueta seleccionada} other {# etiquetas seleccionadas}}",
+      "mergeSelected": "Combinar…",
+      "mergeTitle": "Combinar en una sola etiqueta",
+      "mergeTargetLabel": "Nombre de la etiqueta de destino",
+      "deleteSelectedConfirm": "{count, plural, one {¿Eliminar la etiqueta seleccionada de todas las recetas?} other {¿Eliminar las {count} etiquetas seleccionadas de todas las recetas?}}",
+      "allergyBadge": "alergia"
     }
   },
   "archiveExport": {
