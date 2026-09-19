@@ -25,7 +25,7 @@ const MIGRATIONS_FOLDER = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../src/migrations"
 );
-const CLEANUP_MIGRATION = resolve(MIGRATIONS_FOLDER, "0045_clean_auto_tagging_tags.sql");
+const CLEANUP_MIGRATION = resolve(MIGRATIONS_FOLDER, "0054_clean_auto_tagging_tags.sql");
 
 /** Tags the migration must remove (associations and rows). */
 const RETIRED = [
@@ -112,7 +112,7 @@ describe("auto-tagging garbage leaving the Tag vocabulary", () => {
     );
 
     const prior = journal.entries.filter(
-      (entry: { tag: string }) => entry.tag !== "0045_clean_auto_tagging_tags"
+      (entry: { tag: string }) => entry.tag !== "0054_clean_auto_tagging_tags"
     );
 
     for (const entry of prior) {

@@ -25,7 +25,7 @@ const MIGRATIONS_FOLDER = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../src/migrations"
 );
-const PRUNE_MIGRATION = resolve(MIGRATIONS_FOLDER, "0046_prune_legacy_tag_vocabulary.sql");
+const PRUNE_MIGRATION = resolve(MIGRATIONS_FOLDER, "0055_prune_legacy_tag_vocabulary.sql");
 
 /** Tags the migration must remove (associations and rows); `tofu` is allergy-guarded and asserted separately below. */
 const RETIRED = [
@@ -109,7 +109,7 @@ describe("the legacy tag vocabulary leaving the pool", () => {
     );
 
     const prior = journal.entries.filter(
-      (entry: { tag: string }) => entry.tag !== "0046_prune_legacy_tag_vocabulary"
+      (entry: { tag: string }) => entry.tag !== "0055_prune_legacy_tag_vocabulary"
     );
 
     for (const entry of prior) {

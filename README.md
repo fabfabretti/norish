@@ -16,6 +16,14 @@
 
 # Norish
 
+> **Fork note:** this repository is [fabfabretti/norish](https://github.com/fabfabretti/norish), a fork tracking [norish-recipes/norish](https://github.com/norish-recipes/norish) with additional features merged on top. To sync upstream: `git fetch upstream && git merge upstream/main`. Fork-owned changes:
+>
+> - Recipe extraction from social post captions before video download
+> - Smart (rule-driven) cookbook collections
+> - Tag administration UI plus a curated tag kit enforced in auto-tagging (`0053`–`0055` fork-owned migrations; upstream's end at `0052`)
+> - DeepSeek compatibility fix for AI structured output
+> - Additive CI: `.github/workflows/docker-ci-image.yml` builds a GHCR test image — upstream workflow files stay untouched
+
 Norish is a real-time, household-first recipe app for planning meals, sharing groceries, and cooking together.
 
 **For the website and documentation see: [norish.dev](https://norish.dev) and [docs.norish.dev](https://docs.norish.dev)**

@@ -52,6 +52,21 @@ sections (never passing a finished prompt string — ADR-0016).
 - Definition of done: the `CONTRIBUTING.md` gates — `pnpm lint`, `pnpm test:run`, `pnpm i18n:check`, `pnpm build` — plus tests for new functionality. User-visible workflows whose acceptance criteria depend on browser behavior also require passing E2E coverage and follow `docs/agents/feature-docs.md`.
 - Keep repo guidance concise; prefer practical conventions over long project narratives.
 
+## Branch model (this fork)
+
+- `main` is the fork trunk: it always sits on top of upstream (`norish-recipes/norish`)
+  and our merged features. Sync upstream with `git fetch upstream && git merge upstream/main`.
+- Work happens on short-lived `feature/<topic>` branches off `main`; merge a feature
+  into `main` when it's done, then delete the branch. Do not pile unrelated topics
+  onto one branch.
+- **Migrations:** upstream owns `0000`–`0052`; never renumber them. Fork-owned
+  migrations start at `0053`. Adding a fork migration whose number collides with a
+  future upstream one means renumbering ours, not theirs, while your own DB has not
+  applied it — see the 0053–0055 renumber for how this fork did it.
+- **CI:** keep fork CI additive. No `.github/workflows/*` file that exists upstream is
+  ever modified here — fork-only workflows live in their own files
+  (`.github/workflows/docker-ci-image.yml`).
+
 ## Agent skills
 
 ### Issue tracker
