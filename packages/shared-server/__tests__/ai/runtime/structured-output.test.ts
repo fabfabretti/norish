@@ -38,7 +38,9 @@ vi.mock("@norish/shared-server/logger", () => {
   return { aiLogger: logger, serverLogger: logger, createLogger: () => logger };
 });
 
-const { generateStructured } = await import("@norish/shared-server/ai/runtime/runtime");
+const { generateStructured, repairArrayShape } =
+  await import("@norish/shared-server/ai/runtime/runtime");
+const { canDegradeToJsonMode } = await import("@norish/shared-server/ai/runtime/providers");
 const { AIProviderError } = await import("@norish/shared-server/ai/runtime/errors");
 
 interface CapturedRequest {
@@ -49,7 +51,7 @@ let captured: CapturedRequest[] = [];
 let replies: (() => { status: number; body: unknown })[] = [];
 
 /** The answer the model gives when it plays along. */
-function tagged(): { status: number; body: unknown } {
+function tagged(content = '{ "tags": ["Italian"] }'): { status: number; body: unknown } {
   return {
     status: 200,
     body: {
@@ -60,7 +62,7 @@ function tagged(): { status: number; body: unknown } {
       choices: [
         {
           index: 0,
-          message: { role: "assistant", content: JSON.stringify({ tags: ["Italian"] }) },
+          message: { role: "assistant", content },
           finish_reason: "stop",
         },
       ],
@@ -82,6 +84,48 @@ function noEndpoints(): { status: number; body: unknown } {
     },
   };
 }
+
+/** A reply that parses as JSON but fails the schema: an array as an object. */
+describe("a compat provider eligible for plain-JSON retry (DeepSeek)", () => {
+  it("is now treated like the generic OpenAI-compatible endpoints", () => {
+    expect(canDegradeToJsonMode("deepseek")).toBe(true);
+  });
+});
+
+describe("repairArrayShape", () => {
+  const schema = z.object({
+    tags: z.array(z.string()),
+    nested: z.object({ metric: z.array(z.string()) }),
+  });
+
+  it("turns a numeric-key object into the array the schema expects", () => {
+    expect(repairArrayShape({ tags: { 0: "Italian", 1: "French" } }, schema)).toEqual({
+      tags: ["Italian", "French"],
+    });
+  });
+
+  it("unwraps a single wrapper key holding an array", () => {
+    expect(repairArrayShape({ tags: { ingredients: ["Italian"] } }, schema)).toEqual({
+      tags: ["Italian"],
+    });
+  });
+
+  it("treats an empty object as an empty array", () => {
+    expect(repairArrayShape({ tags: {} }, schema)).toEqual({ tags: [] });
+  });
+
+  it("repairs the flaked shape a large schema produced, nested and end to end", () => {
+    expect(
+      repairArrayShape({ tags: ["Italian"], nested: { metric: { 0: "x", 1: "y" } } }, schema)
+    ).toEqual({ tags: ["Italian"], nested: { metric: ["x", "y"] } });
+  });
+
+  it("leaves already-conforming values untouched", () => {
+    const input = { tags: ["Italian"], nested: { metric: ["x"] } };
+
+    expect(repairArrayShape(input, schema)).toEqual(input);
+  });
+});
 
 const server = createServer((req, res) => {
   const chunks: Buffer[] = [];
