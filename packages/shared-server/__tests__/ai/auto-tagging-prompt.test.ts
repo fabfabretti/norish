@@ -1,15 +1,18 @@
 // @vitest-environment node
 /**
- * Cuisine has left the predefined Tag vocabulary.
+ * The auto-tagging vocabulary lives in code now, not in the prompt.
  *
- * Asserted against the shipped prompt file rather than a mock, because the file
- * is what a deployment actually sends to the model.
+ * The shipped prompt rules no longer carry a tag list — the ALLOWED TAGS kit is
+ * a code constant appended as a section and enforced after the model replies,
+ * so the two can never drift apart (the prompt once promised a predefined list
+ * no code ever checked).
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { AUTO_TAGGING_KIT_TAGS } from "@norish/shared-server/ai/enrichment/auto-tagging-prompt";
 import { resolveExistingWorkspacePath } from "@norish/shared-server/lib/workspace-paths";
 
 const AUTO_TAGGING_PROMPT = readFileSync(
@@ -34,25 +37,41 @@ const FORMER_CUISINE_TAGS = [
   "chinese",
 ];
 
-describe("the shipped auto-tagging prompt", () => {
-  const predefined = AUTO_TAGGING_PROMPT.slice(
-    AUTO_TAGGING_PROMPT.indexOf("PREDEFINED TAGS:"),
-    AUTO_TAGGING_PROMPT.indexOf("Do NOT create new tags")
-  );
+describe("the auto-tagging kit", () => {
+  const kitLower = AUTO_TAGGING_KIT_TAGS.join(" ").toLowerCase();
 
-  it.each(FORMER_CUISINE_TAGS)("no longer offers %s as a tag", (cuisine) => {
-    expect(predefined.toLowerCase()).not.toContain(cuisine);
+  it("no longer offers any former cuisine as a tag", () => {
+    for (const cuisine of FORMER_CUISINE_TAGS) {
+      expect(kitLower).not.toContain(cuisine);
+    }
   });
 
   it("keeps the tags that were never cuisines", () => {
-    for (const tag of ["vegetarian", "breakfast", "slow cooker", "kid-friendly"]) {
-      expect(predefined).toContain(tag);
+    for (const tag of ["vegetarian", "slow cooker", "snack", "quick meal"]) {
+      expect(kitLower).toContain(tag);
     }
+  });
+
+  it("never offers meal occasions that belong to the Categories field", () => {
+    for (const tag of ["breakfast", "lunch", "dinner"]) {
+      expect(kitLower).not.toContain(tag);
+    }
+  });
+});
+
+describe("the shipped auto-tagging prompt", () => {
+  it("no longer embeds a tag list — the ALLOWED TAGS kit is appended as a section", () => {
+    expect(AUTO_TAGGING_PROMPT).not.toContain("PREDEFINED TAGS:");
+    expect(AUTO_TAGGING_PROMPT).not.toContain("Do NOT create new tags outside this list");
   });
 
   it("tells the model where cuisine lives instead", () => {
     // Without this the model reaches for a cuisine anyway and mints a free-form
     // tag, which is exactly the folksonomy the vocabulary exists to replace.
     expect(AUTO_TAGGING_PROMPT).toMatch(/Cuisines/);
+  });
+
+  it("tells the model that meal occasions live in Categories, not Tags", () => {
+    expect(AUTO_TAGGING_PROMPT).toMatch(/Categories/);
   });
 });

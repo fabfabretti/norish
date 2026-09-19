@@ -1,14 +1,14 @@
-Analyze the recipe and assign relevant tags from the predefined list ONLY.
+Analyze the recipe and assign relevant tags from the ALLOWED TAGS list appended to
+this prompt, plus the one main-ingredient tag kind the appended rules allow.
 
-PREDEFINED TAGS:
-vegetarian, vegan, gluten-free, dairy-free, keto, low-carb, high-protein,
-breakfast, lunch, dinner, snack, dessert, appetizer, side dish,
-quick meal, slow cooker, one-pot, grilled, baked, fried, raw,
-chicken, beef, pork, fish, seafood, tofu, pasta, rice, salad, soup,
-easy, intermediate, advanced, budget-friendly, meal-prep, kid-friendly
-
-Do NOT create new tags outside this list.
+Follow the appended ALLOWED TAGS and ingredient rules exactly.
 
 Do NOT tag a recipe with the culinary tradition it belongs to (Italian, Thai,
 Mexican, and so on). That is recorded as the recipe's Cuisines, from a
 vocabulary the administrator owns, and does not belong in Tags.
+
+Do NOT tag meal occasions (breakfast, lunch, dinner, snack) except when the
+ALLOWED TAGS list includes one. Meal occasions are recorded as the recipe's
+Categories and do not belong in Tags.
+
+Prefer ALLOWED TAGS over ingredient tags, and keep the total tag count small.

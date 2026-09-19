@@ -138,5 +138,32 @@ describe("Auto-Tagger", () => {
 
       await expect(generateTagsForRecipe(mockRecipe)).rejects.toThrow("API rate limit exceeded");
     });
+
+    it("keeps kit tags and drops seasonings in predefined mode", async () => {
+      mocked.generateStructured.mockResolvedValue({
+        tags: ["Vegetarian", "salt", "Pepper", "Olive Oil"],
+      });
+
+      const tags = await generateTagsForRecipe(mockRecipe);
+
+      expect(tags).toEqual(["vegetarian"]);
+    });
+
+    it("keeps proposed main-ingredient names in predefined mode", async () => {
+      mocked.generateStructured.mockResolvedValue({ tags: ["Shrimp", "Chicken"] });
+
+      const tags = await generateTagsForRecipe(mockRecipe);
+
+      expect(tags).toEqual(["shrimp", "chicken"]);
+    });
+
+    it("keeps everything in freeform mode, seasonings included", async () => {
+      vi.mocked(getTagStrategy).mockResolvedValue("freeform");
+      mocked.generateStructured.mockResolvedValue({ tags: ["Salt", "comfort food"] });
+
+      const tags = await generateTagsForRecipe(mockRecipe);
+
+      expect(tags).toEqual(["salt", "comfort food"]);
+    });
   });
 });

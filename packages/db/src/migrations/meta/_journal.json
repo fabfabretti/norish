@@ -379,6 +379,13 @@
       "when": 1789049540590,
       "tag": "0053_cookbook_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1789804980991,
+      "tag": "0054_clean_auto_tagging_tags",
+      "breakpoints": true
     }
   ]
 }
