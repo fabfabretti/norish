@@ -50,6 +50,15 @@ Tags**, which lists every tag with the number of recipes carrying it.
 Anyone without server admin can add tags to their own recipes freely; the admin
 manager only governs renaming, merging, and deleting across the whole server.
 
+## Where tags come from
+
+Auto-tagging follows the **tag strategy** from **Settings => Admin => AI &
+Processing**; see [Tag strategy](../configuration/ai-provider.md#tag-strategy).
+Whatever the strategy, only a curated kit of tags, the main ingredients of a
+recipe, and — when allowed — the tags your household already uses can ever be
+added, and the rule is enforced in code: the model is not trusted to stay in
+bounds on its own.
+
 ## From the library toolbar
 
 Administrators also get a **Manage tags** button in the library toolbar that

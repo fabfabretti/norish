@@ -57,10 +57,20 @@ describe("buildAutoTaggingSections", () => {
       expect(listAllTagNames).not.toHaveBeenCalled();
     });
 
-    it("appends no strategy addition, only the recipe", async () => {
+    it("appends the code-owned ALLOWED TAGS section and the recipe", async () => {
       const sections = await buildAutoTaggingSections({}, mockRecipe);
 
-      expect(sections).toHaveLength(1);
+      expect(sections).toHaveLength(2);
+      expect(sections[0]).toContain("ALLOWED TAGS:");
+      expect(sections[0]).toContain("Vegetarian, Vegan, High-Protein");
+      expect(sections[0]).toContain("Quick Meal");
+    });
+
+    it("states the main-ingredient rule and the seasoning ban", async () => {
+      const sections = await buildAutoTaggingSections({}, mockRecipe);
+
+      expect(sections[0]).toContain("ingredient of the recipe, in English");
+      expect(sections[0]).toContain("never name seasonings, condiments, oil");
     });
 
     it("includes the recipe context", async () => {
