@@ -71,6 +71,22 @@ export function SmartCookbookPanel({
     setTagIds((prev) => (prev.includes(id) ? prev.filter((tag) => tag !== id) : [...prev, id]));
   }, []);
 
+  // Writing a tag in full and pressing Enter selects it, exactly as clicking
+  // the chip would. The field clears so the next tag can be written without
+  // erasing a hand.
+  const selectExactMatch = useCallback(() => {
+    const trimmed = tagFilter.trim().toLowerCase();
+
+    if (!trimmed) return;
+
+    const match = tags.find((tag) => tag.name.toLowerCase() === trimmed);
+
+    if (match) {
+      toggleTag(match.id);
+      setTagFilter("");
+    }
+  }, [tagFilter, tags, toggleTag]);
+
   const trimmedTitle = title.trim();
   const canSubmit = editing || trimmedTitle.length > 0;
 
@@ -132,6 +148,12 @@ export function SmartCookbookPanel({
               value={tagFilter}
               variant="secondary"
               onChange={(event) => setTagFilter(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  selectExactMatch();
+                }
+              }}
             />
             {tagFilter.length > 0 && (
               <button

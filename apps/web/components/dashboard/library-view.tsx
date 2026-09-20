@@ -44,7 +44,7 @@ export default function LibraryView({ variant }: { variant: RecipeDashboardViewM
     enterSelectionMode,
     exitSelectionMode,
   } = useRecipesContext();
-  const { deleteCookbook } = useCookbooksMutations();
+  const { deleteCookbook, updateRule } = useCookbooksMutations();
 
   // The same filters the context passes, so both share one cache entry and
   // one request.
@@ -82,6 +82,13 @@ export default function LibraryView({ variant }: { variant: RecipeDashboardViewM
             cookbook={item.cookbook}
             variant={variant}
             onDelete={deleteCookbook}
+            onUpdateRule={(rule) =>
+              updateRule({
+                id: item.cookbook.id,
+                version: item.cookbook.version,
+                rule,
+              })
+            }
           />
         );
       }
@@ -108,6 +115,7 @@ export default function LibraryView({ variant }: { variant: RecipeDashboardViewM
       deleteRecipe,
       toggleFavorite,
       deleteCookbook,
+      updateRule,
       selectionMode,
       selectedIds,
       toggleSelect,
@@ -118,8 +126,8 @@ export default function LibraryView({ variant }: { variant: RecipeDashboardViewM
   const bulkBar = selectionMode ? (
     <BulkSelectionBar
       selectedCount={selectedIds.size}
-      onExit={exitSelectionMode}
       selectedIds={Array.from(selectedIds)}
+      onExit={exitSelectionMode}
     />
   ) : null;
 

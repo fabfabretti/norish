@@ -132,13 +132,15 @@ function CookbookCardComponent({
       });
     }
 
-    if (canEdit && isSmart) {
+    // Every cookbook can be given or re-pointed a tag rule — a plain one the
+    // reader is free to leave empty, a smart one already there.
+    if (canEdit) {
       list.push({
         key: "rules",
         icon: AdjustmentsVerticalIcon,
         color: "warning",
         onPress: () => setRulesOpen(true),
-        label: tCollections("editSmartTitle"),
+        label: tCollections("editRuleTitle"),
       });
     }
 
@@ -435,7 +437,7 @@ function CookbookCardComponent({
         <CookbookAddRecipesPanel cookbook={cookbook} open={addOpen} onOpenChange={setAddOpen} />
       )}
 
-      {rulesMounted && isSmart && (
+      {rulesMounted && (
         <SmartCookbookPanel
           cookbook={cookbook}
           open={rulesOpen}

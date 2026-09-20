@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CookbookAddRecipesPanel } from "@/components/cookbooks/cookbook-add-recipes-panel";
 import { CookbookEditPanel, DeleteCookbookModal } from "@/components/cookbooks/cookbook-panels";
+import { SmartCookbookPanel } from "@/components/cookbooks/cookbook-smart-panel";
 import RecipeViewModeToggle from "@/components/dashboard/recipe-view-mode-toggle";
 import SearchInput from "@/components/dashboard/search-input";
 import { NotFoundView } from "@/components/shared/not-found-view";
@@ -17,6 +18,7 @@ import { useCookbookQuery, useCookbooksMutations } from "@/hooks/cookbooks";
 import { useBackDestination } from "@/hooks/use-back-destination";
 import { recipeViewModePreference } from "@/lib/recipe-view-mode";
 import {
+  AdjustmentsVerticalIcon,
   ArrowLeftIcon,
   EllipsisHorizontalIcon,
   PencilSquareIcon,
@@ -26,6 +28,8 @@ import {
 import { Button, Dropdown, Label, Spinner, Tabs } from "@heroui/react";
 import { useTranslations } from "next-intl";
 import { twMerge } from "tailwind-merge";
+
+import type { CookbookRuleDTO } from "@norish/shared/contracts";
 
 import { cssButtonPill, cssButtonPillDanger } from "@norish/web/config/css-tokens";
 
@@ -46,13 +50,15 @@ function CookbookPageContent({ cookbookId }: { cookbookId: string }) {
   const router = useRouter();
   const [viewMode, setViewMode] = useRecipeDashboardViewMode();
   const t = useTranslations("recipes.cookbooks");
+  const tCollections = useTranslations("recipes.collections");
   const { cookbook, isNotFound } = useCookbookQuery(cookbookId);
-  const { deleteCookbook } = useCookbooksMutations();
+  const { deleteCookbook, updateRule } = useCookbooksMutations();
   const { canEditRecipe, canDeleteRecipe } = usePermissionsContext();
   const back = useBackDestination();
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const handleDelete = useCallback(() => {
@@ -61,6 +67,15 @@ function CookbookPageContent({ cookbookId }: { cookbookId: string }) {
     deleteCookbook({ id: cookbook.id, version: cookbook.version });
     router.push("/");
   }, [cookbook, deleteCookbook, router]);
+
+  const handleUpdateRule = useCallback(
+    (rule: CookbookRuleDTO) => {
+      if (!cookbook) return;
+      setRulesOpen(false);
+      updateRule({ id: cookbook.id, version: cookbook.version, rule });
+    },
+    [cookbook, updateRule]
+  );
 
   if (isNotFound) {
     return <NotFoundView message={t("notFoundHint")} title={t("notFound")} />;
@@ -77,6 +92,9 @@ function CookbookPageContent({ cookbookId }: { cookbookId: string }) {
   // Cookbooks answer to the recipe permission policy (ADR-0027).
   const canEdit = cookbook.userId ? canEditRecipe(cookbook.userId) : true;
   const canDelete = cookbook.userId ? canDeleteRecipe(cookbook.userId) : true;
+  // A smart cookbook's members come from its tag rule, so it cannot be filed
+  // into by hand (ADR-0027) — only its rule is editable.
+  const isSmart = cookbook.rule?.kind === "tags";
 
   return (
     <section aria-labelledby={COOKBOOK_HEADING_ID} className="flex min-h-0 flex-1 flex-col">
@@ -126,7 +144,7 @@ function CookbookPageContent({ cookbookId }: { cookbookId: string }) {
                   </Button>
                   <Dropdown.Popover className="bg-overlay z-[500]" placement="bottom end">
                     <Dropdown.Menu aria-label={t("options")}>
-                      {canEdit ? (
+                      {canEdit && !isSmart ? (
                         <Dropdown.Item
                           key="add"
                           className="py-1 data-[focus=true]:bg-transparent data-[hovered=true]:bg-transparent"
@@ -147,6 +165,32 @@ function CookbookPageContent({ cookbookId }: { cookbookId: string }) {
                           >
                             <PlusIcon className="text-muted size-4" />
                             <Label className="text-sm font-medium">{t("addRecipes")}</Label>
+                          </Button>
+                        </Dropdown.Item>
+                      ) : null}
+                      {canEdit ? (
+                        <Dropdown.Item
+                          key="rules"
+                          className="py-1 data-[focus=true]:bg-transparent data-[hovered=true]:bg-transparent"
+                          id="rules"
+                          textValue={tCollections("editRuleTitle")}
+                        >
+                          <Button
+                            className={twMerge(
+                              "w-full justify-start bg-transparent",
+                              cssButtonPill
+                            )}
+                            size="md"
+                            variant="tertiary"
+                            onPress={() => {
+                              setMenuOpen(false);
+                              setRulesOpen(true);
+                            }}
+                          >
+                            <AdjustmentsVerticalIcon className="text-muted size-4" />
+                            <Label className="text-sm font-medium">
+                              {tCollections("editRuleTitle")}
+                            </Label>
                           </Button>
                         </Dropdown.Item>
                       ) : null}
@@ -224,6 +268,13 @@ function CookbookPageContent({ cookbookId }: { cookbookId: string }) {
       </Tabs>
 
       <CookbookEditPanel cookbook={cookbook} open={editOpen} onOpenChange={setEditOpen} />
+
+      <SmartCookbookPanel
+        cookbook={cookbook}
+        open={rulesOpen}
+        onOpenChange={setRulesOpen}
+        onUpdateRule={handleUpdateRule}
+      />
 
       <CookbookAddRecipesPanel cookbook={cookbook} open={addOpen} onOpenChange={setAddOpen} />
 

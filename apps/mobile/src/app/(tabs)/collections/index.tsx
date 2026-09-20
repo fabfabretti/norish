@@ -65,7 +65,7 @@ export default function CollectionsScreen() {
           return (
             <Pressable
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
-              onPress={() => (isSmart ? onOpenRule(item) : undefined)}
+              onPress={() => onOpenRule(item)}
             >
               <View style={styles.rowText}>
                 <Text style={[styles.rowTitle, { color: foregroundColor }]} numberOfLines={1}>
@@ -78,7 +78,7 @@ export default function CollectionsScreen() {
                     : ""}
                 </Text>
               </View>
-              {isSmart ? <Ionicons name="options-outline" size={18} color={mutedColor} /> : null}
+              <Ionicons name="options-outline" size={18} color={mutedColor} />
             </Pressable>
           );
         }}
@@ -155,10 +155,12 @@ function RuleSheet({
   const [title, setTitle] = useState("");
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [matchMode, setMatchMode] = useState<"AND" | "OR">("OR");
+  const [tagFilter, setTagFilter] = useState("");
   const editing = cookbook !== null;
 
   useEffect(() => {
     if (!isPresented) return;
+    setTagFilter("");
     if (!cookbook) {
       setTitle("");
       setTagIds([]);
@@ -174,6 +176,23 @@ function RuleSheet({
   const toggleTag = useCallback((id: string) => {
     setTagIds((prev) => (prev.includes(id) ? prev.filter((tag) => tag !== id) : [...prev, id]));
   }, []);
+
+  const selectExactMatch = useCallback(() => {
+    const trimmed = tagFilter.trim().toLowerCase();
+
+    if (!trimmed) return;
+
+    const match = tags.find((tag) => tag.name.toLowerCase() === trimmed);
+
+    if (match) {
+      toggleTag(match.id);
+      setTagFilter("");
+    }
+  }, [tagFilter, tags, toggleTag]);
+
+  const filteredTags = tagFilter.trim()
+    ? tags.filter((tag) => tag.name.toLowerCase().includes(tagFilter.trim().toLowerCase()))
+    : tags;
 
   const rule: CookbookRuleDTO =
     tagIds.length === 0 ? { kind: "manual" } : { kind: "tags", tagIds, matchMode };
@@ -211,13 +230,24 @@ function RuleSheet({
         <Text style={[styles.fieldLabel, { color: mutedColor }]}>
           {intl.formatMessage({ id: "recipes.collections.tagsLabel" })}
         </Text>
+        <TextInput
+          value={tagFilter}
+          onChangeText={setTagFilter}
+          onSubmitEditing={selectExactMatch}
+          placeholder={intl.formatMessage({ id: "recipes.collections.searchTags" })}
+          placeholderTextColor={mutedColor}
+          style={[
+            styles.tagSearch,
+            { color: foregroundColor, backgroundColor: accentColor, borderColor: accentColor },
+          ]}
+        />
         <View style={styles.tagWrap}>
-          {tags.length === 0 ? (
+          {filteredTags.length === 0 ? (
             <Text style={[styles.emptyHint, { color: mutedColor }]}>
               {intl.formatMessage({ id: "recipes.collections.emptyTags" })}
             </Text>
           ) : (
-            tags.map((tag) => {
+            filteredTags.map((tag) => {
               const active = tagIds.includes(tag.id);
               return (
                 <Pressable
@@ -316,6 +346,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  tagSearch: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    marginTop: 4,
+  },
   tagPill: {
     borderRadius: 999,
     borderWidth: 1,
